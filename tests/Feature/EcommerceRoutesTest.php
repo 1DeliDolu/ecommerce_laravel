@@ -28,7 +28,7 @@ class EcommerceRoutesTest extends TestCase
         $this->get(route('account.orders.index'))
             ->assertOk();
 
-        $this->get(route('admin.overview.index'))
+        $this->get(route('admin.categories.index'))
             ->assertForbidden();
     }
 
@@ -41,7 +41,7 @@ class EcommerceRoutesTest extends TestCase
 
         $this->actingAs($adminUser);
 
-        $this->get(route('admin.overview.index'))
+        $this->get(route('admin.categories.index'))
             ->assertOk();
     }
 }
