@@ -8,14 +8,6 @@ type Category = {
     parent_id: number | null;
 };
 
-type ImageInput = {
-    disk?: string;
-    path: string;
-    alt?: string | null;
-    sort_order?: number;
-    is_primary?: boolean;
-};
-
 type ProductFormData = {
     name: string;
     slug: string;
@@ -26,7 +18,6 @@ type ProductFormData = {
     stock: string;
     is_active: boolean;
     category_ids: number[];
-    images: ImageInput[];
 };
 
 type Mode = 'create' | 'edit';
@@ -74,7 +65,6 @@ export default function ProductForm({
         stock: initialValues?.stock ?? '0',
         is_active: initialValues?.is_active ?? true,
         category_ids: initialValues?.category_ids ?? [],
-        images: initialValues?.images ?? [],
     });
 
     const sortedCategories = useMemo(() => {
@@ -99,36 +89,6 @@ export default function ProductForm({
                 ? data.category_ids.filter((x) => x !== id)
                 : [...data.category_ids, id],
         );
-    };
-
-    const addImage = () => {
-        setData('images', [
-            ...data.images,
-            {
-                disk: 'public',
-                path: '',
-                alt: '',
-                sort_order: data.images.length,
-                is_primary: data.images.length === 0,
-            },
-        ]);
-    };
-
-    const removeImage = (index: number) => {
-        const next = data.images.filter((_, i) => i !== index);
-        if (next.length > 0 && !next.some((x) => x.is_primary)) {
-            next[0].is_primary = true;
-        }
-        next.forEach((img, i) => (img.sort_order = i));
-        setData('images', next);
-    };
-
-    const setPrimary = (index: number) => {
-        const next = data.images.map((img, i) => ({
-            ...img,
-            is_primary: i === index,
-        }));
-        setData('images', next);
     };
 
     const submit = (e: React.FormEvent) => {
@@ -325,159 +285,6 @@ export default function ProductForm({
                             </label>
                         );
                     })}
-                </div>
-            </div>
-
-            {/* Images (temporary) */}
-            <div className="rounded-md border bg-background p-4">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <h3 className="text-sm font-medium">Images</h3>
-                        <p className="text-xs text-muted-foreground">
-                            Temporary input (path strings). We'll replace this
-                            with real uploads later.
-                        </p>
-                    </div>
-
-                    <button
-                        type="button"
-                        onClick={addImage}
-                        className="inline-flex items-center rounded-md border bg-background px-3 py-2 text-sm font-medium hover:bg-accent"
-                    >
-                        Add image
-                    </button>
-                </div>
-
-                {errors.images ? (
-                    <div className="mt-2 text-xs text-destructive">
-                        {errors.images as string}
-                    </div>
-                ) : null}
-
-                <div className="mt-4 space-y-3">
-                    {data.images.length === 0 ? (
-                        <div className="text-sm text-muted-foreground">
-                            No images.
-                        </div>
-                    ) : (
-                        data.images.map((img, idx) => (
-                            <div key={idx} className="rounded-md border p-3">
-                                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                                    <div className="grid w-full gap-3 md:grid-cols-3">
-                                        <div className="md:col-span-2">
-                                            <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                                                Path *
-                                            </label>
-                                            <input
-                                                value={img.path}
-                                                onChange={(e) => {
-                                                    const next = [
-                                                        ...data.images,
-                                                    ];
-                                                    next[idx] = {
-                                                        ...next[idx],
-                                                        path: e.target.value,
-                                                    };
-                                                    setData('images', next);
-                                                }}
-                                                className="w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background outline-none focus:ring-2 focus:ring-ring"
-                                                placeholder="products/abc.jpg"
-                                            />
-                                            {(errors as Record<string, string>)[
-                                                `images.${idx}.path`
-                                            ] ? (
-                                                <div className="mt-1 text-xs text-destructive">
-                                                    {
-                                                        (
-                                                            errors as Record<
-                                                                string,
-                                                                string
-                                                            >
-                                                        )[`images.${idx}.path`]
-                                                    }
-                                                </div>
-                                            ) : null}
-                                        </div>
-
-                                        <div>
-                                            <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                                                Alt (optional)
-                                            </label>
-                                            <input
-                                                value={img.alt ?? ''}
-                                                onChange={(e) => {
-                                                    const next = [
-                                                        ...data.images,
-                                                    ];
-                                                    next[idx] = {
-                                                        ...next[idx],
-                                                        alt: e.target.value,
-                                                    };
-                                                    setData('images', next);
-                                                }}
-                                                className="w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background outline-none focus:ring-2 focus:ring-ring"
-                                                placeholder="e.g. Front view"
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                                                Sort order
-                                            </label>
-                                            <input
-                                                value={String(
-                                                    img.sort_order ?? idx,
-                                                )}
-                                                onChange={(e) => {
-                                                    const next = [
-                                                        ...data.images,
-                                                    ];
-                                                    const val = Number(
-                                                        e.target.value,
-                                                    );
-                                                    next[idx] = {
-                                                        ...next[idx],
-                                                        sort_order:
-                                                            Number.isFinite(val)
-                                                                ? val
-                                                                : idx,
-                                                    };
-                                                    setData('images', next);
-                                                }}
-                                                inputMode="numeric"
-                                                className="w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background outline-none focus:ring-2 focus:ring-ring"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => setPrimary(idx)}
-                                            className={[
-                                                'rounded-md border px-3 py-2 text-sm font-medium',
-                                                img.is_primary
-                                                    ? 'bg-accent'
-                                                    : 'bg-background hover:bg-accent',
-                                            ].join(' ')}
-                                        >
-                                            {img.is_primary
-                                                ? 'Primary'
-                                                : 'Set primary'}
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => removeImage(idx)}
-                                            className="rounded-md border border-destructive/30 bg-background px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10"
-                                        >
-                                            Remove
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        ))
-                    )}
                 </div>
             </div>
 

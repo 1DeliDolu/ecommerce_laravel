@@ -23,6 +23,9 @@ export default function MarketingNav({ canRegister = true }: Props) {
                 </Link>
 
                 <nav className="flex items-center gap-2 sm:gap-3">
+                    <Link href="/products" className={ghostLink}>
+                        Products
+                    </Link>
                     {auth.user ? (
                         <>
                             <Link href={dashboard()} className={outlineLink}>

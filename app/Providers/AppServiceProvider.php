@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Models\ProductImage;
+use App\Observers\ProductImageObserver;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +26,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        ProductImage::observe(ProductImageObserver::class);
+
         Gate::define('access-admin', function ($user): bool {
             $emails = array_filter(array_map('trim', explode(',', (string) env('ADMIN_EMAILS', ''))));
 

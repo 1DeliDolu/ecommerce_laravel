@@ -1,6 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import React from 'react';
 
+import ProductImageManager from '@/components/admin/products/ProductImageManager';
 import AppLayout from '@/layouts/app-layout';
 import ProductForm from '@/pages/admin/products/_components/product-form';
 
@@ -16,6 +17,7 @@ type ProductImage = {
     product_id: number;
     disk: string;
     path: string;
+    url: string;
     alt: string | null;
     sort_order: number;
     is_primary: boolean;
@@ -39,12 +41,14 @@ type Props = {
     product: Product;
     categories: Category[];
     selectedCategoryIds: number[];
+    trashedImages: ProductImage[];
 };
 
 export default function Edit({
     product,
     categories,
     selectedCategoryIds,
+    trashedImages,
 }: Props) {
     const initialValues = {
         name: product.name,
@@ -56,16 +60,6 @@ export default function Edit({
         stock: String(product.stock),
         is_active: product.is_active,
         category_ids: selectedCategoryIds,
-        images: product.images
-            .slice()
-            .sort((a, b) => a.sort_order - b.sort_order)
-            .map((img) => ({
-                disk: img.disk,
-                path: img.path,
-                alt: img.alt ?? '',
-                sort_order: img.sort_order,
-                is_primary: img.is_primary,
-            })),
     };
 
     return (
@@ -107,6 +101,25 @@ export default function Edit({
                         submitUrl={`/admin/products/${product.slug}`}
                         method="put"
                         initialValues={initialValues}
+                    />
+                </div>
+
+                <div className="rounded-lg border bg-card p-4">
+                    <div className="mb-4">
+                        <h2 className="text-lg font-semibold tracking-tight">
+                            Product images
+                        </h2>
+                        <p className="text-sm text-muted-foreground">
+                            Images are stored on the{' '}
+                            <span className="font-semibold">public</span> disk
+                            and served via{' '}
+                            <span className="font-semibold">/storage</span>.
+                        </p>
+                    </div>
+                    <ProductImageManager
+                        productId={product.id}
+                        images={product.images ?? []}
+                        trashedImages={trashedImages ?? []}
                     />
                 </div>
             </div>

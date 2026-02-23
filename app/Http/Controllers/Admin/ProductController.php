@@ -3,51 +3,62 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\StoreProductRequest;
+use App\Http\Requests\Admin\UpdateProductRequest;
 use App\Models\Category;
 use App\Models\Product;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class ProductController extends Controller
 {
-    public function __construct()
-    {
-        $this->authorizeResource(Product::class, 'product');
-    }
-
     public function index(Request $request): Response
     {
-        $q = (string) $request->query('q', '');
-        $status = (string) $request->query('status', 'all'); // all|active|inactive
-        $category = (string) $request->query('category', ''); // category slug
-        $stock = (string) $request->query('stock', 'all'); // all|in|out
+        $this->authorize('viewAny', Product::class);
 
-        $products = Product::query()
+        $q = (string) $request->query('q', '');
+        $status = (string) $request->query('status', 'all');
+        $category = (string) $request->query('category', '');
+        $stock = (string) $request->query('stock', 'all');
+
+        $query = Product::query()
             ->with([
                 'categories:id,name,slug',
                 'primaryImage:id,product_id,disk,path,alt,sort_order,is_primary',
             ])
-            ->withCount('images')
-            ->when($q !== '', function ($query) use ($q) {
-                $query->where(function ($sub) use ($q) {
-                    $sub->where('name', 'like', '%'.$q.'%')
-                        ->orWhere('slug', 'like', '%'.$q.'%')
-                        ->orWhere('sku', 'like', '%'.$q.'%');
-                });
-            })
-            ->when($status === 'active', fn ($query) => $query->where('is_active', true))
-            ->when($status === 'inactive', fn ($query) => $query->where('is_active', false))
-            ->when($stock === 'in', fn ($query) => $query->where('stock', '>', 0))
-            ->when($stock === 'out', fn ($query) => $query->where('stock', '=', 0))
-            ->when($category !== '', function ($query) use ($category) {
-                $query->whereHas('categories', fn ($q) => $q->where('slug', $category));
-            })
+            ->withCount('images');
+
+        if ($status === 'trashed') {
+            $query->onlyTrashed();
+        } elseif ($status === 'active') {
+            $query->where('is_active', true);
+        } elseif ($status === 'inactive') {
+            $query->where('is_active', false);
+        }
+
+        if ($q !== '') {
+            $query->where(function ($sub) use ($q) {
+                $sub->where('name', 'like', '%'.$q.'%')
+                    ->orWhere('slug', 'like', '%'.$q.'%')
+                    ->orWhere('sku', 'like', '%'.$q.'%');
+            });
+        }
+
+        if ($stock === 'in') {
+            $query->where('stock', '>', 0);
+        } elseif ($stock === 'out') {
+            $query->where('stock', '=', 0);
+        }
+
+        if ($category !== '') {
+            $query->whereHas('categories', fn ($q) => $q->where('slug', $category));
+        }
+
+        $products = $query
             ->orderByDesc('id')
             ->paginate(15)
             ->withQueryString();
@@ -71,6 +82,8 @@ class ProductController extends Controller
 
     public function create(): Response
     {
+        $this->authorize('create', Product::class);
+
         $categories = Category::query()
             ->select(['id', 'name', 'slug', 'parent_id'])
             ->orderBy('name')
@@ -81,49 +94,45 @@ class ProductController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(StoreProductRequest $request): RedirectResponse
     {
-        $validated = $this->validatePayload($request);
+        $this->authorize('create', Product::class);
 
-        return DB::transaction(function () use ($validated) {
-            $productData = Arr::only($validated, [
-                'name',
-                'slug',
-                'description',
-                'price',
-                'compare_at_price',
-                'sku',
-                'stock',
-                'is_active',
+        $data = $request->validated();
+
+        $product = null;
+
+        DB::transaction(function () use ($data, &$product) {
+            $slugInput = trim((string) ($data['slug'] ?? ''));
+            $baseSlug = $slugInput !== '' ? $slugInput : (string) $data['name'];
+            $slug = $this->generateUniqueSlug($baseSlug);
+
+            $product = Product::create([
+                'name' => $data['name'],
+                'slug' => $slug,
+                'description' => $data['description'] ?? null,
+                'price' => $data['price'],
+                'compare_at_price' => $data['compare_at_price'] ?? null,
+                'sku' => $data['sku'] ?? null,
+                'stock' => $data['stock'] ?? 0,
+                'is_active' => (bool) ($data['is_active'] ?? false),
             ]);
 
-            $baseSlug = $productData['slug'] !== null && $productData['slug'] !== ''
-                ? $productData['slug']
-                : $productData['name'];
-
-            $productData['slug'] = $this->makeUniqueSlug($baseSlug);
-
-            /** @var Product $product */
-            $product = Product::query()->create($productData);
-
-            $product->categories()->sync($validated['category_ids']);
-
-            if (! empty($validated['images'])) {
-                $images = $this->normalizeImages($validated['images']);
-                $product->images()->createMany($images);
-            }
-
-            return redirect()
-                ->route('admin.products.show', $product)
-                ->with('success', 'Product created.');
+            $product->categories()->sync($data['category_ids'] ?? []);
         });
+
+        return redirect()
+            ->route('admin.products.edit', $product)
+            ->with('success', 'Product created successfully. You can now upload images.');
     }
 
     public function show(Product $product): Response
     {
+        $this->authorize('view', $product);
+
         $product->load([
             'categories:id,name,slug',
-            'images:id,product_id,disk,path,alt,sort_order,is_primary',
+            'images' => fn ($q) => $q->orderByDesc('is_primary')->orderBy('id'),
         ]);
 
         return Inertia::render('admin/products/show', [
@@ -133,10 +142,17 @@ class ProductController extends Controller
 
     public function edit(Product $product): Response
     {
+        $this->authorize('update', $product);
+
         $product->load([
             'categories:id',
-            'images:id,product_id,disk,path,alt,sort_order,is_primary',
+            'images' => fn ($q) => $q->orderByDesc('is_primary')->orderBy('id'),
         ]);
+
+        $trashedImages = $product->images()
+            ->onlyTrashed()
+            ->orderBy('id')
+            ->get();
 
         $categories = Category::query()
             ->select(['id', 'name', 'slug', 'parent_id'])
@@ -147,162 +163,67 @@ class ProductController extends Controller
             'product' => $product,
             'categories' => $categories,
             'selectedCategoryIds' => $product->categories->pluck('id')->all(),
+            'trashedImages' => $trashedImages,
         ]);
     }
 
-    public function update(Request $request, Product $product): RedirectResponse
+    public function update(UpdateProductRequest $request, Product $product): RedirectResponse
     {
-        $validated = $this->validatePayload($request, $product);
+        $this->authorize('update', $product);
 
-        return DB::transaction(function () use ($validated, $product) {
-            $productData = Arr::only($validated, [
-                'name',
-                'slug',
-                'description',
-                'price',
-                'compare_at_price',
-                'sku',
-                'stock',
-                'is_active',
-            ]);
+        $data = $request->validated();
 
-            // Keep slug stable unless explicitly provided.
-            if ($productData['slug'] !== null && $productData['slug'] !== '') {
-                $productData['slug'] = $this->makeUniqueSlug($productData['slug'], $product->id);
-            } else {
-                unset($productData['slug']);
+        DB::transaction(function () use ($data, $product) {
+            $slugInput = trim((string) ($data['slug'] ?? ''));
+
+            // Slug stability: only update slug if admin explicitly provides a new one.
+            if ($slugInput !== '') {
+                $product->slug = $this->generateUniqueSlug($slugInput, $product->id);
             }
 
-            $product->update($productData);
+            $product->fill([
+                'name' => $data['name'],
+                'description' => $data['description'] ?? null,
+                'price' => $data['price'],
+                'compare_at_price' => $data['compare_at_price'] ?? null,
+                'sku' => $data['sku'] ?? null,
+                'stock' => $data['stock'] ?? 0,
+                'is_active' => (bool) ($data['is_active'] ?? false),
+            ])->save();
 
-            $product->categories()->sync($validated['category_ids']);
-
-            // If images are provided, replace all images (soft delete old ones).
-            if (array_key_exists('images', $validated) && is_array($validated['images'])) {
-                $product->images()->delete();
-
-                if (! empty($validated['images'])) {
-                    $images = $this->normalizeImages($validated['images']);
-                    $product->images()->createMany($images);
-                }
-            }
-
-            return redirect()
-                ->route('admin.products.show', $product)
-                ->with('success', 'Product updated.');
+            $product->categories()->sync($data['category_ids'] ?? []);
         });
+
+        return back()->with('success', 'Product updated successfully.');
     }
 
     public function destroy(Product $product): RedirectResponse
     {
-        return DB::transaction(function () use ($product) {
-            // Soft delete images as well so they don't show up in UI.
-            $product->images()->delete();
-            $product->delete();
+        $this->authorize('delete', $product);
 
-            return redirect()
-                ->route('admin.products.index')
-                ->with('success', 'Product deleted.');
-        });
+        $product->delete();
+
+        return redirect()
+            ->route('admin.products.index')
+            ->with('success', 'Product deleted successfully.');
     }
 
-    private function validatePayload(Request $request, ?Product $product = null): array
+    private function generateUniqueSlug(string $base, ?int $ignoreId = null): string
     {
-        return $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-
-            // Slug is optional; we generate from name if empty on create.
-            'slug' => [
-                'nullable',
-                'string',
-                'max:255',
-                Rule::unique('products', 'slug')->ignore($product?->id),
-            ],
-
-            'description' => ['nullable', 'string'],
-
-            'price' => ['required', 'numeric', 'min:0'],
-            'compare_at_price' => ['nullable', 'numeric', 'min:0', 'gte:price'],
-
-            'sku' => [
-                'nullable',
-                'string',
-                'max:64',
-                Rule::unique('products', 'sku')->ignore($product?->id),
-            ],
-
-            'stock' => ['required', 'integer', 'min:0'],
-            'is_active' => ['required', 'boolean'],
-
-            // Categories (pivot)
-            'category_ids' => ['required', 'array', 'min:1'],
-            'category_ids.*' => ['integer', Rule::exists('categories', 'id')],
-
-            // Images (optional for now; later we will handle uploads)
-            'images' => ['sometimes', 'array'],
-            'images.*.disk' => ['nullable', 'string', 'max:64'],
-            'images.*.path' => ['required_with:images', 'string', 'max:2048'],
-            'images.*.alt' => ['nullable', 'string', 'max:255'],
-            'images.*.sort_order' => ['nullable', 'integer', 'min:0'],
-            'images.*.is_primary' => ['nullable', 'boolean'],
-        ]);
-    }
-
-    private function makeUniqueSlug(string $value, ?int $ignoreId = null): string
-    {
-        $base = Str::slug($value);
-        $slug = $base;
+        $slug = Str::slug($base);
+        $original = $slug;
         $i = 2;
 
         while (
-            Product::query()
-                ->when($ignoreId !== null, fn ($q) => $q->where('id', '!=', $ignoreId))
+            Product::withTrashed()
                 ->where('slug', $slug)
+                ->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))
                 ->exists()
         ) {
-            $slug = $base.'-'.$i;
+            $slug = "{$original}-{$i}";
             $i++;
         }
 
         return $slug;
-    }
-
-    /**
-     * Normalize images payload:
-     * - Ensure exactly one primary image (first image if none explicitly marked).
-     * - Fill missing sort_order with array index order.
-     */
-    private function normalizeImages(array $images): array
-    {
-        $normalized = [];
-        $primaryIndex = null;
-
-        foreach (array_values($images) as $idx => $img) {
-            $isPrimary = (bool) ($img['is_primary'] ?? false);
-
-            if ($primaryIndex === null && $isPrimary) {
-                $primaryIndex = $idx;
-            }
-
-            $normalized[] = [
-                'disk' => (string) ($img['disk'] ?? 'public'),
-                'path' => (string) ($img['path'] ?? ''),
-                'alt' => $img['alt'] ?? null,
-                'sort_order' => isset($img['sort_order']) ? (int) $img['sort_order'] : $idx,
-                'is_primary' => $isPrimary,
-            ];
-        }
-
-        if (! empty($normalized)) {
-            if ($primaryIndex === null) {
-                $primaryIndex = 0;
-            }
-
-            foreach ($normalized as $i => $row) {
-                $normalized[$i]['is_primary'] = $i === $primaryIndex;
-            }
-        }
-
-        return $normalized;
     }
 }

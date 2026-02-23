@@ -1,10 +1,30 @@
 <?php
 
-use App\Http\Controllers\Admin\CategoryController;
-use App\Http\Controllers\Admin\ProductController;
+use App\Http\Controllers\Admin\CategoryController as AdminCategoryController;
+use App\Http\Controllers\Admin\ProductController as AdminProductController;
+use App\Http\Controllers\Admin\ProductImageController as AdminProductImageController;
+use App\Http\Controllers\Admin\TrashedProductImageController as AdminTrashedProductImageController;
+use App\Http\Controllers\Shop\ProductController as ShopProductController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
+/*
+|--------------------------------------------------------------------------
+| Shop Routes (Public)
+|--------------------------------------------------------------------------
+*/
+Route::prefix('products')
+    ->as('shop.products.')
+    ->group(function () {
+        Route::get('/', [ShopProductController::class, 'index'])->name('index');
+        Route::get('{slug}', [ShopProductController::class, 'show'])->name('show');
+    });
+
+/*
+|--------------------------------------------------------------------------
+| Account Routes (Authenticated)
+|--------------------------------------------------------------------------
+*/
 Route::middleware(['auth', 'verified'])
     ->prefix('account')
     ->as('account.')
@@ -14,14 +34,43 @@ Route::middleware(['auth', 'verified'])
         Route::get('payment-methods', fn () => Inertia::render('account/payment-methods/index'))->name('payment-methods.index');
     });
 
+/*
+|--------------------------------------------------------------------------
+| Admin Routes (Authenticated + Authorized)
+|--------------------------------------------------------------------------
+*/
 Route::middleware(['auth', 'verified', 'can:access-admin'])
     ->prefix('admin')
     ->as('admin.')
     ->group(function () {
         Route::get('overview', fn () => Inertia::render('admin/overview/index'))->name('overview.index');
-        Route::get('products', fn () => Inertia::render('admin/products/index'))->name('products.index');
         Route::get('orders', fn () => Inertia::render('admin/orders/index'))->name('orders.index');
 
-        Route::resource('categories', CategoryController::class);
-        Route::resource('products', ProductController::class);
+        Route::resource('categories', AdminCategoryController::class);
+        Route::resource('products', AdminProductController::class);
+
+        // Trashed product images list
+        Route::get('product-images/trashed', [AdminTrashedProductImageController::class, 'index'])
+            ->name('product-images.trashed');
+
+        // Product image upload / management
+        Route::post('products/{product}/images', [AdminProductImageController::class, 'store'])
+            ->name('products.images.store');
+
+        Route::patch('product-images/{productImage}', [AdminProductImageController::class, 'update'])
+            ->name('product-images.update');
+
+        // Soft delete
+        Route::delete('product-images/{productImage}', [AdminProductImageController::class, 'destroy'])
+            ->name('product-images.destroy');
+
+        // Restore (needs trashed model binding)
+        Route::patch('product-images/{productImage}/restore', [AdminProductImageController::class, 'restore'])
+            ->withTrashed()
+            ->name('product-images.restore');
+
+        // Force delete (permanent) - allow trashed binding too
+        Route::delete('product-images/{productImage}/force', [AdminProductImageController::class, 'forceDestroy'])
+            ->withTrashed()
+            ->name('product-images.force-destroy');
     });
