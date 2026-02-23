@@ -6,7 +6,7 @@ type Props = {
 };
 
 export default function MarketingNav({ canRegister = true }: Props) {
-    const { auth } = usePage().props;
+    const { auth } = usePage().props as any;
 
     const baseLink =
         'inline-flex items-center rounded-sm px-4 py-1.5 text-sm leading-normal transition';
@@ -23,7 +23,12 @@ export default function MarketingNav({ canRegister = true }: Props) {
                 </Link>
 
                 <nav className="flex items-center gap-2 sm:gap-3">
-                    {auth.user ? (
+                    {/* Public shop entry point (works once /products routes exist) */}
+                    <Link href="/products" className={ghostLink}>
+                        Shop
+                    </Link>
+
+                    {auth?.user ? (
                         <>
                             <Link href={dashboard()} className={outlineLink}>
                                 Dashboard

@@ -1,27 +1,56 @@
 <?php
 
-use App\Http\Controllers\Admin\CategoryController;
-use App\Http\Controllers\Admin\ProductController;
+use App\Http\Controllers\Admin\CategoryController as AdminCategoryController;
+use App\Http\Controllers\Admin\ProductController as AdminProductController;
+use App\Http\Controllers\Admin\ProductImageController as AdminProductImageController;
+use App\Http\Controllers\Shop\ProductController as ShopProductController;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
+/*
+|--------------------------------------------------------------------------
+| Public Shop Routes
+|--------------------------------------------------------------------------
+*/
+Route::get('/products', [ShopProductController::class, 'index'])
+    ->name('shop.products.index');
+
+Route::get('/products/{product:slug}', [ShopProductController::class, 'show'])
+    ->name('shop.products.show');
+
+/*
+|--------------------------------------------------------------------------
+| Account Routes (Authenticated)
+|--------------------------------------------------------------------------
+*/
 Route::middleware(['auth', 'verified'])
     ->prefix('account')
     ->as('account.')
     ->group(function () {
-        Route::get('orders', fn () => Inertia::render('account/orders/index'))->name('orders.index');
-        Route::get('addresses', fn () => Inertia::render('account/addresses/index'))->name('addresses.index');
-        Route::get('payment-methods', fn () => Inertia::render('account/payment-methods/index'))->name('payment-methods.index');
+        // Coming soon:
+        // Route::get('/orders', ...)->name('orders.index');
+        // Route::resource('/addresses', ...);
+        // Route::resource('/payment-methods', ...);
     });
 
+/*
+|--------------------------------------------------------------------------
+| Admin Routes (Authenticated + Authorized)
+|--------------------------------------------------------------------------
+*/
 Route::middleware(['auth', 'verified', 'can:access-admin'])
     ->prefix('admin')
     ->as('admin.')
     ->group(function () {
-        Route::get('overview', fn () => Inertia::render('admin/overview/index'))->name('overview.index');
-        Route::get('products', fn () => Inertia::render('admin/products/index'))->name('products.index');
-        Route::get('orders', fn () => Inertia::render('admin/orders/index'))->name('orders.index');
+        Route::resource('categories', AdminCategoryController::class);
+        Route::resource('products', AdminProductController::class);
 
-        Route::resource('categories', CategoryController::class);
-        Route::resource('products', ProductController::class);
+        // Product image upload / management
+        Route::post('products/{product}/images', [AdminProductImageController::class, 'store'])
+            ->name('products.images.store');
+
+        Route::patch('product-images/{productImage}', [AdminProductImageController::class, 'update'])
+            ->name('product-images.update');
+
+        Route::delete('product-images/{productImage}', [AdminProductImageController::class, 'destroy'])
+            ->name('product-images.destroy');
     });

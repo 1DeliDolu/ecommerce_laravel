@@ -10,23 +10,23 @@ class EcommerceRoutesTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_guests_are_redirected_from_account_and_admin_routes_to_login(): void
+    public function test_guests_are_redirected_from_admin_routes_to_login(): void
     {
-        $this->get(route('account.orders.index'))
-            ->assertRedirect(route('login'));
-
-        $this->get(route('admin.overview.index'))
+        $this->get(route('admin.categories.index'))
             ->assertRedirect(route('login'));
     }
 
-    public function test_authenticated_non_admin_user_can_access_account_but_not_admin_routes(): void
+    public function test_guests_can_access_public_shop_routes(): void
+    {
+        $this->get(route('shop.products.index'))
+            ->assertOk();
+    }
+
+    public function test_authenticated_non_admin_user_cannot_access_admin_routes(): void
     {
         $user = User::factory()->create();
 
         $this->actingAs($user);
-
-        $this->get(route('account.orders.index'))
-            ->assertOk();
 
         $this->get(route('admin.categories.index'))
             ->assertForbidden();
