@@ -1,5 +1,17 @@
 import { Link } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid } from 'lucide-react';
+import {
+    BookOpen,
+    CreditCard,
+    Gauge,
+    LayoutGrid,
+    MapPin,
+    Package,
+    Receipt,
+    ShoppingBag,
+    Tags,
+    Folder,
+} from 'lucide-react';
+
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -12,16 +24,31 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
+
+import { toUrl } from '@/lib/utils';
 import type { NavItem } from '@/types';
-import AppLogo from './app-logo';
+import AppLogo from '@/components/app-logo';
 import { dashboard } from '@/routes';
 
-const mainNavItems: NavItem[] = [
+const platformNavItems: NavItem[] = [
+    { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
+];
+
+const accountNavItems: NavItem[] = [
+    { title: 'Orders', href: '/account/orders', icon: Receipt },
+    { title: 'Addresses', href: '/account/addresses', icon: MapPin },
     {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
+        title: 'Payment Methods',
+        href: '/account/payment-methods',
+        icon: CreditCard,
     },
+];
+
+const adminNavItems: NavItem[] = [
+    { title: 'Overview', href: '/admin/overview', icon: Gauge },
+    { title: 'Categories', href: '/admin/categories', icon: Tags },
+    { title: 'Products', href: '/admin/products', icon: Package },
+    { title: 'Orders', href: '/admin/orders', icon: ShoppingBag },
 ];
 
 const footerNavItems: NavItem[] = [
@@ -39,12 +66,12 @@ const footerNavItems: NavItem[] = [
 
 export function AppSidebar() {
     return (
-        <Sidebar collapsible="icon" variant="inset">
+        <Sidebar collapsible="icon">
             <SidebarHeader>
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
-                            <Link href={dashboard()} prefetch>
+                            <Link href={toUrl(dashboard())}>
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>
@@ -53,11 +80,13 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain items={mainNavItems} />
+                <NavMain label="Platform" items={platformNavItems} />
+                <NavMain label="Account" items={accountNavItems} />
+                <NavMain label="Admin" items={adminNavItems} />
             </SidebarContent>
 
             <SidebarFooter>
-                <NavFooter items={footerNavItems} className="mt-auto" />
+                <NavFooter items={footerNavItems} />
                 <NavUser />
             </SidebarFooter>
         </Sidebar>
