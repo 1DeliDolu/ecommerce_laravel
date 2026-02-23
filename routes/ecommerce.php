@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\CategoryController;
+use App\Http\Controllers\Admin\ProductController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -22,4 +23,5 @@ Route::middleware(['auth', 'verified', 'can:access-admin'])
         Route::get('orders', fn () => Inertia::render('admin/orders/index'))->name('orders.index');
 
         Route::resource('categories', CategoryController::class);
+        Route::resource('products', ProductController::class);
     });
