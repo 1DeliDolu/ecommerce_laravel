@@ -1,4 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
+import AddToCartForm from '@/components/cart/add-to-cart-form';
 
 import ProductImage from '@/components/shop/ProductImage';
 import MarketingLayout from '@/layouts/marketing-layout';
@@ -115,13 +116,16 @@ export default function ShopProductShow({ product }: Props) {
                         )}
 
                         <div className="pt-6">
-                            <button
-                                type="button"
-                                disabled
-                                className="w-full rounded-2xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white opacity-60 dark:bg-white dark:text-gray-900"
-                            >
-                                Add to cart (coming soon)
-                            </button>
+                            <AddToCartForm productId={product.id} />
+
+                            <div className="mt-2">
+                                <Link
+                                    href="/cart"
+                                    className="text-sm text-blue-600 hover:underline"
+                                >
+                                    View cart
+                                </Link>
+                            </div>
                         </div>
                     </div>
                 </div>

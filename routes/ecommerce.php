@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\CategoryController as AdminCategoryController;
 use App\Http\Controllers\Admin\ProductController as AdminProductController;
 use App\Http\Controllers\Admin\ProductImageController as AdminProductImageController;
 use App\Http\Controllers\Admin\TrashedProductImageController as AdminTrashedProductImageController;
+use App\Http\Controllers\Shop\CartController as ShopCartController;
 use App\Http\Controllers\Shop\ProductController as ShopProductController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -13,6 +14,16 @@ use Inertia\Inertia;
 | Shop Routes (Public)
 |--------------------------------------------------------------------------
 */
+Route::prefix('cart')
+    ->as('shop.cart.')
+    ->group(function () {
+        Route::get('/', [ShopCartController::class, 'index'])->name('index');
+        Route::post('/', [ShopCartController::class, 'store'])->name('store');
+        Route::patch('{productId}', [ShopCartController::class, 'update'])->name('update');
+        Route::delete('{productId}', [ShopCartController::class, 'destroy'])->name('destroy');
+        Route::delete('/', [ShopCartController::class, 'clear'])->name('clear');
+    });
+
 Route::prefix('products')
     ->as('shop.products.')
     ->group(function () {

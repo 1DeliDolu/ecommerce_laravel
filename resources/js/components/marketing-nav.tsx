@@ -1,4 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
+import CartBadge from '@/components/cart/cart-badge';
 import { dashboard, login, register } from '@/routes';
 
 type Props = {
@@ -6,7 +7,10 @@ type Props = {
 };
 
 export default function MarketingNav({ canRegister = true }: Props) {
-    const { auth } = usePage().props;
+    const page = usePage();
+    const { auth } = page.props;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cartCount = (page.props as any)?.cart?.items_count ?? 0;
 
     const baseLink =
         'inline-flex items-center rounded-sm px-4 py-1.5 text-sm leading-normal transition';
@@ -23,6 +27,7 @@ export default function MarketingNav({ canRegister = true }: Props) {
                 </Link>
 
                 <nav className="flex items-center gap-2 sm:gap-3">
+                    <CartBadge count={cartCount} />
                     <Link href="/products" className={ghostLink}>
                         Products
                     </Link>

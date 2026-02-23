@@ -38,6 +38,10 @@ class HandleInertiaRequests extends Middleware
                 'warning' => fn () => $request->session()->get('warning'),
                 'info' => fn () => $request->session()->get('info'),
             ],
+
+            'cart' => fn () => [
+                'items_count' => (int) data_get($request->session()->get('cart', []), 'summary.items_count', 0),
+            ],
         ]);
     }
 }
