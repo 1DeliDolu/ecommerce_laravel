@@ -37,6 +37,7 @@ class HandleInertiaRequests extends Middleware
                 'is_admin' => $request->user()
                     ? Gate::forUser($request->user())->check('access-admin')
                     : false,
+                'tier' => $request->user()?->tier?->value,
             ],
 
             'flash' => [

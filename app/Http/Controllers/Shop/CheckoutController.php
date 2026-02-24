@@ -9,6 +9,8 @@ use App\Mail\OrderPlaced;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Services\CartService;
+use App\Services\PricingContext;
+use App\Services\TierPricingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +20,10 @@ use Inertia\Response;
 
 class CheckoutController extends Controller
 {
-    public function __construct(private readonly CartService $cartService) {}
+    public function __construct(
+        private readonly CartService $cartService,
+        private readonly TierPricingService $pricing,
+    ) {}
 
     public function index(Request $request): Response
     {
@@ -59,11 +64,13 @@ class CheckoutController extends Controller
             return back()->with('error', 'Your cart is empty.');
         }
 
-        $shippingCents = 500;
-        $taxCents = (int) round($subtotalCents * 0.084);
-        $totalCents = $subtotalCents + $shippingCents + $taxCents;
-
         $user = $request->user();
+        $pricingCtx = new PricingContext($user, $items);
+
+        $shippingCents = $this->pricing->hasFreeShipping($pricingCtx, $subtotalCents) ? 0 : 500;
+        $discountCents = $this->pricing->discountCents($pricingCtx, $subtotalCents);
+        $taxCents = (int) round($subtotalCents * 0.084);
+        $totalCents = $subtotalCents - $discountCents + $shippingCents + $taxCents;
 
         $order = DB::transaction(function () use (
             $request,
@@ -73,12 +80,14 @@ class CheckoutController extends Controller
             $taxCents,
             $shippingCents,
             $totalCents,
+            $pricingCtx,
             $cart
         ) {
             /** @var \App\Models\Order $order */
             $order = Order::create([
                 'user_id' => $user?->id,
                 'status' => 'pending',
+                'customer_tier' => $pricingCtx->tier->value,
 
                 'first_name' => (string) $request->string('first_name'),
                 'last_name' => (string) $request->string('last_name'),

@@ -16,6 +16,7 @@ class Order extends Model
         'user_id',
         'public_id',
         'status',
+        'customer_tier',
 
         'first_name',
         'last_name',

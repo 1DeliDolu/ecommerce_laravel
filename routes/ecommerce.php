@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Account\AddressController as AccountAddressController;
 use App\Http\Controllers\Account\OrderController as AccountOrderController;
 use App\Http\Controllers\Admin\CategoryController as AdminCategoryController;
 use App\Http\Controllers\Admin\OrderController as AdminOrderController;
@@ -49,7 +50,7 @@ Route::middleware(['auth', 'verified'])
     ->as('account.')
     ->group(function () {
         Route::get('orders', [AccountOrderController::class, 'index'])->name('orders.index');
-        Route::get('addresses', fn () => Inertia::render('account/addresses/index'))->name('addresses.index');
+        Route::get('addresses', [AccountAddressController::class, 'index'])->name('addresses.index');
         Route::get('payment-methods', fn () => Inertia::render('account/payment-methods/index'))->name('payment-methods.index');
 
         /**
