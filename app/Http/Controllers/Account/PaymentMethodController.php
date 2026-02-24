@@ -28,7 +28,7 @@ class PaymentMethodController extends Controller
     public function store(PaymentMethodRequest $request): RedirectResponse
     {
         $user = $request->user();
-        $data = $request->validated();
+        $data = $request->safe()->except('card_number');
 
         // First card automatically becomes the default.
         if (! $user->paymentMethods()->exists()) {
@@ -44,7 +44,7 @@ class PaymentMethodController extends Controller
     {
         $this->authorizeOwnership($request, $paymentMethod);
 
-        $paymentMethod->update($request->validated());
+        $paymentMethod->update($request->safe()->except('card_number'));
 
         return back()->with('success', 'Payment method updated.');
     }

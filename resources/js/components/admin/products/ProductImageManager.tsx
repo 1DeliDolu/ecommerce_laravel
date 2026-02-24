@@ -9,7 +9,7 @@ type ProductImage = {
 };
 
 type Props = {
-    productId: number;
+    productId: string;
     images: ProductImage[];
     trashedImages: ProductImage[];
 };

@@ -117,7 +117,7 @@ export default function Edit({
                         </p>
                     </div>
                     <ProductImageManager
-                        productId={product.id}
+                        productId={product.slug}
                         images={product.images ?? []}
                         trashedImages={trashedImages ?? []}
                     />

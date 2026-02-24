@@ -37,8 +37,8 @@ type PaymentMethod = {
 };
 
 type FormData = {
+    card_number: string;
     brand: string;
-    last4: string;
     cardholder_name: string;
     exp_month: string;
     exp_year: string;
@@ -50,7 +50,13 @@ type Props = {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const BRANDS = ['visa', 'mastercard', 'amex', 'discover'];
+const BRANDS = [
+    { value: 'visa', label: 'Visa' },
+    { value: 'mastercard', label: 'Mastercard' },
+    { value: 'amex', label: 'American Express' },
+    { value: 'discover', label: 'Discover' },
+    { value: 'troy', label: 'Troy' },
+];
 
 const BRAND_STYLES: Record<string, string> = {
     visa: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
@@ -58,6 +64,7 @@ const BRAND_STYLES: Record<string, string> = {
     amex: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
     discover:
         'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+    troy: 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200',
 };
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => {
@@ -75,12 +82,35 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const emptyForm: FormData = {
+    card_number: '',
     brand: '',
-    last4: '',
     cardholder_name: '',
     exp_month: '',
     exp_year: '',
 };
+
+// ─── Card Number Helpers ─────────────────────────────────────────────────────
+
+function detectBrand(digits: string): string {
+    if (/^4/.test(digits)) return 'visa';
+    if (/^(5[1-5]|2[2-7]\d{2})/.test(digits)) return 'mastercard';
+    if (/^3[47]/.test(digits)) return 'amex';
+    if (/^(6011|65|64[4-9]|622)/.test(digits)) return 'discover';
+    if (/^9792/.test(digits)) return 'troy';
+    return '';
+}
+
+function formatCardNumber(value: string): string {
+    const digits = value.replace(/\D/g, '');
+    if (/^3[47]/.test(digits)) {
+        // Amex: 4-6-5
+        return [digits.slice(0, 4), digits.slice(4, 10), digits.slice(10, 15)]
+            .filter(Boolean)
+            .join(' ');
+    }
+    // Default: 4-4-4-4
+    return (digits.match(/.{1,4}/g) ?? []).join(' ');
+}
 
 // ─── Card Form ────────────────────────────────────────────────────────────────
 
@@ -92,6 +122,7 @@ function CardForm({
     onSubmit,
     onCancel,
     submitLabel,
+    cardHint,
 }: {
     data: FormData;
     errors: Partial<Record<keyof FormData, string>>;
@@ -100,46 +131,77 @@ function CardForm({
     onSubmit: (e: React.FormEvent) => void;
     onCancel: () => void;
     submitLabel: string;
+    cardHint?: string;
 }) {
+    const digits = data.card_number.replace(/\D/g, '');
+    const autoBrand = detectBrand(digits);
+    const displayBrand = autoBrand || data.brand;
+    const isAmex = displayBrand === 'amex';
+    const maxLength = isAmex ? 17 : 19; // digits + spaces
+
     return (
         <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2">
-            {/* Brand */}
-            <div className="flex flex-col gap-1.5">
-                <Label htmlFor="brand">Card brand</Label>
-                <Select
-                    value={data.brand}
-                    onValueChange={(v) => setData('brand', v)}
-                >
-                    <SelectTrigger id="brand">
-                        <SelectValue placeholder="Select brand" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {BRANDS.map((b) => (
-                            <SelectItem
-                                key={b}
-                                value={b}
-                                className="capitalize"
-                            >
-                                {b.charAt(0).toUpperCase() + b.slice(1)}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-                <InputError message={errors.brand} />
+            {/* Card number */}
+            <div className="col-span-full flex flex-col gap-1.5">
+                <Label htmlFor="card_number">Card number</Label>
+                <div className="relative">
+                    <Input
+                        id="card_number"
+                        value={data.card_number}
+                        onChange={(e) => {
+                            const formatted = formatCardNumber(e.target.value);
+                            const detected = detectBrand(
+                                formatted.replace(/\D/g, ''),
+                            );
+                            setData('card_number', formatted);
+                            if (detected) setData('brand', detected);
+                        }}
+                        maxLength={maxLength}
+                        placeholder={
+                            cardHint ??
+                            (isAmex
+                                ? '•••• •••••• •••••'
+                                : '•••• •••• •••• ••••')
+                        }
+                        inputMode="numeric"
+                        autoComplete="cc-number"
+                        className="pr-24 font-mono tracking-widest"
+                    />
+                    {displayBrand && (
+                        <span
+                            className={`absolute top-1/2 right-3 -translate-y-1/2 rounded px-2 py-0.5 text-xs font-semibold capitalize ${
+                                BRAND_STYLES[displayBrand] ?? ''
+                            }`}
+                        >
+                            {displayBrand}
+                        </span>
+                    )}
+                </div>
+                <InputError message={errors.card_number} />
             </div>
 
-            {/* Last 4 */}
-            <div className="flex flex-col gap-1.5">
-                <Label htmlFor="last4">Last 4 digits</Label>
-                <Input
-                    id="last4"
-                    value={data.last4}
-                    onChange={(e) => setData('last4', e.target.value)}
-                    maxLength={4}
-                    placeholder="1234"
-                />
-                <InputError message={errors.last4} />
-            </div>
+            {/* Brand — shown when auto-detect is uncertain */}
+            {!autoBrand && (
+                <div className="col-span-full flex flex-col gap-1.5">
+                    <Label htmlFor="brand">Card type</Label>
+                    <Select
+                        value={data.brand}
+                        onValueChange={(v) => setData('brand', v)}
+                    >
+                        <SelectTrigger id="brand">
+                            <SelectValue placeholder="Select card type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {BRANDS.map((b) => (
+                                <SelectItem key={b.value} value={b.value}>
+                                    {b.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <InputError message={errors.brand} />
+                </div>
+            )}
 
             {/* Cardholder */}
             <div className="col-span-full flex flex-col gap-1.5">
@@ -233,8 +295,8 @@ export default function PaymentMethodsIndex({ paymentMethods }: Props) {
 
     const startEdit = (m: PaymentMethod) => {
         editForm.setData({
+            card_number: '',
             brand: m.brand,
-            last4: m.last4,
             cardholder_name: m.cardholder_name,
             exp_month: String(m.exp_month),
             exp_year: String(m.exp_year),
@@ -322,6 +384,7 @@ export default function PaymentMethodsIndex({ paymentMethods }: Props) {
                                         }
                                         onCancel={() => setEditingId(null)}
                                         submitLabel="Update"
+                                        cardHint={`•••• •••• •••• ${method.last4}`}
                                     />
                                 ) : (
                                     <>

@@ -42,8 +42,7 @@ class PaymentMethodControllerTest extends TestCase
 
         $this->actingAs($user)
             ->post(route('account.payment-methods.store'), [
-                'brand' => 'visa',
-                'last4' => '4242',
+                'card_number' => '4111111111111111',
                 'cardholder_name' => 'Jane Doe',
                 'exp_month' => 12,
                 'exp_year' => 2028,
@@ -53,7 +52,7 @@ class PaymentMethodControllerTest extends TestCase
         $this->assertDatabaseHas('payment_methods', [
             'user_id' => $user->id,
             'brand' => 'visa',
-            'last4' => '4242',
+            'last4' => '1111',
         ]);
     }
 
@@ -63,8 +62,7 @@ class PaymentMethodControllerTest extends TestCase
 
         $this->actingAs($user)
             ->post(route('account.payment-methods.store'), [
-                'brand' => 'mastercard',
-                'last4' => '1111',
+                'card_number' => '5500000000000004',
                 'cardholder_name' => 'John Doe',
                 'exp_month' => 6,
                 'exp_year' => 2027,
@@ -82,8 +80,7 @@ class PaymentMethodControllerTest extends TestCase
 
         $this->actingAs($user)
             ->post(route('account.payment-methods.store'), [
-                'brand' => 'amex',
-                'last4' => '5678',
+                'card_number' => '378282246310005',
                 'cardholder_name' => 'Jane',
                 'exp_month' => 1,
                 'exp_year' => 2029,
@@ -91,7 +88,7 @@ class PaymentMethodControllerTest extends TestCase
 
         $this->assertDatabaseHas('payment_methods', [
             'user_id' => $user->id,
-            'last4' => '5678',
+            'last4' => '0005',
             'is_default' => false,
         ]);
     }
@@ -102,17 +99,31 @@ class PaymentMethodControllerTest extends TestCase
 
         $this->actingAs($user)
             ->post(route('account.payment-methods.store'), [])
-            ->assertSessionHasErrors(['brand', 'last4', 'cardholder_name', 'exp_month', 'exp_year']);
+            ->assertSessionHasErrors(['card_number', 'cardholder_name', 'exp_month', 'exp_year']);
     }
 
-    public function test_store_rejects_invalid_brand(): void
+    public function test_store_rejects_invalid_card_number(): void
     {
         $user = User::factory()->create();
 
         $this->actingAs($user)
             ->post(route('account.payment-methods.store'), [
-                'brand' => 'bitcoin',
-                'last4' => '1234',
+                'card_number' => '12345',
+                'cardholder_name' => 'Jane',
+                'exp_month' => 1,
+                'exp_year' => 2030,
+            ])
+            ->assertSessionHasErrors(['card_number']);
+    }
+
+    public function test_store_rejects_unrecognised_card_brand(): void
+    {
+        $user = User::factory()->create();
+
+        // Starts with 9 — not Visa/MC/Amex/Discover
+        $this->actingAs($user)
+            ->post(route('account.payment-methods.store'), [
+                'card_number' => '9111111111111111',
                 'cardholder_name' => 'Jane',
                 'exp_month' => 1,
                 'exp_year' => 2030,
@@ -129,8 +140,7 @@ class PaymentMethodControllerTest extends TestCase
 
         $this->actingAs($user)
             ->patch(route('account.payment-methods.update', $method), [
-                'brand' => 'mastercard',
-                'last4' => '9999',
+                'card_number' => '5500000000000004',
                 'cardholder_name' => 'Updated Name',
                 'exp_month' => 3,
                 'exp_year' => 2030,
@@ -140,7 +150,7 @@ class PaymentMethodControllerTest extends TestCase
         $this->assertDatabaseHas('payment_methods', [
             'id' => $method->id,
             'cardholder_name' => 'Updated Name',
-            'last4' => '9999',
+            'last4' => '0004',
         ]);
     }
 
@@ -151,8 +161,7 @@ class PaymentMethodControllerTest extends TestCase
 
         $this->actingAs($user)
             ->patch(route('account.payment-methods.update', $other), [
-                'brand' => 'visa',
-                'last4' => '1111',
+                'card_number' => '4111111111111111',
                 'cardholder_name' => 'Hacker',
                 'exp_month' => 1,
                 'exp_year' => 2030,
