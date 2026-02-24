@@ -62,35 +62,51 @@ class DashboardController extends Controller
      */
     private function kpis(CarbonInterface $from, CarbonInterface $to, ?int $categoryId = null): array
     {
-        $orderIds = $this->orderIdsForCategory($from, $to, $categoryId);
-
-        $row = Order::query()
-            ->whereIn('status', self::REVENUE_STATUSES)
-            ->whereBetween('created_at', [$from, $to])
-            ->when($orderIds !== null, fn ($q) => $q->whereIn('id', $orderIds))
-            ->selectRaw('
-                COUNT(*) as orders,
-                COALESCE(SUM(total_cents), 0) as revenue_cents,
-                COALESCE(SUM(total_cents) / NULLIF(COUNT(*), 0), 0) as aov_cents
-            ')
-            ->first();
-
-        $units = (int) OrderItem::query()
-            ->whereHas('order', fn ($q) => $q
+        if ($categoryId === null) {
+            $row = Order::query()
                 ->whereIn('status', self::REVENUE_STATUSES)
                 ->whereBetween('created_at', [$from, $to])
-                ->when($orderIds !== null, fn ($q2) => $q2->whereIn('id', $orderIds))
-            )
-            ->when($categoryId !== null, fn ($q) => $q
-                ->join('products', 'products.id', '=', 'order_items.product_id')
-                ->where('products.primary_category_id', $categoryId)
-            )
-            ->sum('quantity');
+                ->selectRaw('
+                    COUNT(*) as orders,
+                    COALESCE(SUM(total_cents), 0) as revenue_cents,
+                    COALESCE(SUM(total_cents) / NULLIF(COUNT(*), 0), 0) as aov_cents
+                ')
+                ->first();
+
+            $units = (int) OrderItem::query()
+                ->whereHas('order', fn ($q) => $q
+                    ->whereIn('status', self::REVENUE_STATUSES)
+                    ->whereBetween('created_at', [$from, $to])
+                )
+                ->sum('quantity');
+
+            return [
+                'revenue_cents' => (int) $row->revenue_cents,
+                'orders' => (int) $row->orders,
+                'units' => $units,
+                'aov_cents' => (int) $row->aov_cents,
+            ];
+        }
+
+        // Category-scoped: aggregate at item level so revenue is for this category only.
+        $row = OrderItem::query()
+            ->join('orders', 'orders.id', '=', 'order_items.order_id')
+            ->join('products', 'products.id', '=', 'order_items.product_id')
+            ->whereIn('orders.status', self::REVENUE_STATUSES)
+            ->whereBetween('orders.created_at', [$from, $to])
+            ->where('products.primary_category_id', $categoryId)
+            ->selectRaw('
+                COUNT(DISTINCT orders.id) as orders,
+                COALESCE(SUM(order_items.line_total_cents), 0) as revenue_cents,
+                COALESCE(SUM(order_items.quantity), 0) as units,
+                COALESCE(SUM(order_items.line_total_cents) / NULLIF(COUNT(DISTINCT orders.id), 0), 0) as aov_cents
+            ')
+            ->first();
 
         return [
             'revenue_cents' => (int) $row->revenue_cents,
             'orders' => (int) $row->orders,
-            'units' => $units,
+            'units' => (int) $row->units,
             'aov_cents' => (int) $row->aov_cents,
         ];
     }
@@ -105,40 +121,58 @@ class DashboardController extends Controller
     private function revenueOverTime(CarbonInterface $from, CarbonInterface $to, string $granularity, ?int $categoryId = null): array
     {
         $periodExpr = $this->periodExpression($granularity);
-        $orderIds = $this->orderIdsForCategory($from, $to, $categoryId);
 
-        $rows = Order::query()
-            ->whereIn('status', self::REVENUE_STATUSES)
-            ->whereBetween('created_at', [$from, $to])
-            ->when($orderIds !== null, fn ($q) => $q->whereIn('id', $orderIds))
+        if ($categoryId === null) {
+            $rows = Order::query()
+                ->whereIn('status', self::REVENUE_STATUSES)
+                ->whereBetween('created_at', [$from, $to])
+                ->selectRaw("
+                    {$periodExpr} as period,
+                    COUNT(*) as orders,
+                    COALESCE(SUM(total_cents), 0) as revenue_cents
+                ")
+                ->groupByRaw($periodExpr)
+                ->orderByRaw($periodExpr)
+                ->get();
+
+            $unitsByPeriod = OrderItem::query()
+                ->join('orders', 'orders.id', '=', 'order_items.order_id')
+                ->whereIn('orders.status', self::REVENUE_STATUSES)
+                ->whereBetween('orders.created_at', [$from, $to])
+                ->selectRaw("{$periodExpr} as period, COALESCE(SUM(order_items.quantity), 0) as units")
+                ->groupByRaw($periodExpr)
+                ->pluck('units', 'period');
+
+            return $rows->map(fn ($r) => [
+                'period' => $r->period,
+                'revenue_cents' => (int) $r->revenue_cents,
+                'orders' => (int) $r->orders,
+                'units' => (int) ($unitsByPeriod[$r->period] ?? 0),
+            ])->values()->all();
+        }
+
+        // Category-scoped: aggregate order_items so only this category's revenue is shown.
+        $rows = OrderItem::query()
+            ->join('orders', 'orders.id', '=', 'order_items.order_id')
+            ->join('products', 'products.id', '=', 'order_items.product_id')
+            ->whereIn('orders.status', self::REVENUE_STATUSES)
+            ->whereBetween('orders.created_at', [$from, $to])
+            ->where('products.primary_category_id', $categoryId)
             ->selectRaw("
                 {$periodExpr} as period,
-                COUNT(*) as orders,
-                COALESCE(SUM(total_cents), 0) as revenue_cents
+                COUNT(DISTINCT orders.id) as orders,
+                COALESCE(SUM(order_items.line_total_cents), 0) as revenue_cents,
+                COALESCE(SUM(order_items.quantity), 0) as units
             ")
             ->groupByRaw($periodExpr)
             ->orderByRaw($periodExpr)
             ->get();
 
-        // Attach units per period
-        $unitsByPeriod = OrderItem::query()
-            ->join('orders', 'orders.id', '=', 'order_items.order_id')
-            ->whereIn('orders.status', self::REVENUE_STATUSES)
-            ->whereBetween('orders.created_at', [$from, $to])
-            ->when($orderIds !== null, fn ($q) => $q->whereIn('orders.id', $orderIds))
-            ->when($categoryId !== null, fn ($q) => $q
-                ->join('products', 'products.id', '=', 'order_items.product_id')
-                ->where('products.primary_category_id', $categoryId)
-            )
-            ->selectRaw("{$periodExpr} as period, COALESCE(SUM(order_items.quantity), 0) as units")
-            ->groupByRaw($periodExpr)
-            ->pluck('units', 'period');
-
         return $rows->map(fn ($r) => [
             'period' => $r->period,
             'revenue_cents' => (int) $r->revenue_cents,
             'orders' => (int) $r->orders,
-            'units' => (int) ($unitsByPeriod[$r->period] ?? 0),
+            'units' => (int) $r->units,
         ])->values()->all();
     }
 
@@ -253,28 +287,6 @@ class DashboardController extends Controller
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
-
-    /**
-     * Returns order IDs that contain at least one item from the given category,
-     * or null when no category filter is applied (meaning "all orders").
-     *
-     * @return \Illuminate\Support\Collection<int,int>|null
-     */
-    private function orderIdsForCategory(CarbonInterface $from, CarbonInterface $to, ?int $categoryId): ?\Illuminate\Support\Collection
-    {
-        if ($categoryId === null) {
-            return null;
-        }
-
-        return OrderItem::query()
-            ->join('orders', 'orders.id', '=', 'order_items.order_id')
-            ->join('products', 'products.id', '=', 'order_items.product_id')
-            ->whereIn('orders.status', self::REVENUE_STATUSES)
-            ->whereBetween('orders.created_at', [$from, $to])
-            ->where('products.primary_category_id', $categoryId)
-            ->pluck('order_items.order_id')
-            ->unique();
-    }
 
     /** @return array{0:Carbon,1:Carbon} */
     private function dateRange(string $range): array

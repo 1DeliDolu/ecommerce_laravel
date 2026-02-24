@@ -1,11 +1,11 @@
 import { Head, router } from '@inertiajs/react';
+import { useState } from 'react';
 import {
     Area,
     AreaChart,
     Bar,
     BarChart,
     CartesianGrid,
-    Legend,
     ResponsiveContainer,
     Tooltip,
     XAxis,
@@ -119,6 +119,28 @@ const CATEGORY_COLORS = [
     '#ec4899',
     '#14b8a6',
     '#f97316',
+    '#0ea5e9',
+    '#84cc16',
+    '#e11d48',
+    '#a855f7',
+    '#06b6d4',
+    '#d97706',
+    '#22c55e',
+    '#f43f5e',
+    '#3b82f6',
+    '#eab308',
+    '#64748b',
+    '#c026d3',
+    '#0891b2',
+    '#16a34a',
+    '#dc2626',
+    '#7c3aed',
+    '#0284c7',
+    '#ca8a04',
+    '#15803d',
+    '#b91c1c',
+    '#6d28d9',
+    '#0369a1',
 ];
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -167,7 +189,23 @@ export default function Dashboard({ stats, filters, categories }: Props) {
     // All derived category names from the performance data
     const categoryNames = Array.from(
         new Set(category_performance.flatMap((p) => Object.keys(p.categories))),
+    ).sort();
+
+    const [hiddenCategories, setHiddenCategories] = useState<Set<string>>(
+        new Set(),
     );
+
+    function toggleCategory(name: string) {
+        setHiddenCategories((prev) => {
+            const next = new Set(prev);
+            if (next.has(name)) {
+                next.delete(name);
+            } else {
+                next.add(name);
+            }
+            return next;
+        });
+    }
 
     function applyFilter(patch: Partial<Filters>) {
         router.get(
@@ -410,9 +448,6 @@ export default function Dashboard({ stats, filters, categories }: Props) {
                                                 ]}
                                                 contentStyle={{ fontSize: 13 }}
                                             />
-                                            <Legend
-                                                wrapperStyle={{ fontSize: 13 }}
-                                            />
                                             {categoryNames.map((name, i) => (
                                                 <Bar
                                                     key={name}
@@ -424,10 +459,70 @@ export default function Dashboard({ stats, filters, categories }: Props) {
                                                                 CATEGORY_COLORS.length
                                                         ]
                                                     }
+                                                    hide={hiddenCategories.has(
+                                                        name,
+                                                    )}
                                                 />
                                             ))}
                                         </BarChart>
                                     </ResponsiveContainer>
+
+                                    {/* Interactive legend */}
+                                    <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2">
+                                        {categoryNames.map((name, i) => {
+                                            const hidden =
+                                                hiddenCategories.has(name);
+                                            return (
+                                                <button
+                                                    key={name}
+                                                    type="button"
+                                                    onClick={() =>
+                                                        toggleCategory(name)
+                                                    }
+                                                    className={`flex cursor-pointer items-center gap-1.5 text-sm transition-opacity ${
+                                                        hidden
+                                                            ? 'opacity-35'
+                                                            : 'opacity-100'
+                                                    }`}
+                                                >
+                                                    <span
+                                                        className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border-2"
+                                                        style={{
+                                                            backgroundColor:
+                                                                hidden
+                                                                    ? 'transparent'
+                                                                    : CATEGORY_COLORS[
+                                                                          i %
+                                                                              CATEGORY_COLORS.length
+                                                                      ],
+                                                            borderColor:
+                                                                CATEGORY_COLORS[
+                                                                    i %
+                                                                        CATEGORY_COLORS.length
+                                                                ],
+                                                        }}
+                                                    >
+                                                        {!hidden && (
+                                                            <svg
+                                                                viewBox="0 0 10 10"
+                                                                className="h-2.5 w-2.5"
+                                                                fill="none"
+                                                            >
+                                                                <path
+                                                                    d="M2 5l2.5 2.5L8 3"
+                                                                    stroke="white"
+                                                                    strokeWidth="1.5"
+                                                                    strokeLinecap="round"
+                                                                    strokeLinejoin="round"
+                                                                />
+                                                            </svg>
+                                                        )}
+                                                    </span>
+                                                    <span>{name}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 </CardContent>
                             </Card>
                         )}
