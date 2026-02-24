@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { useEffect } from 'react';
 
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import MarketingLayout from '@/layouts/marketing-layout';
@@ -54,14 +55,31 @@ export default function CheckoutSuccess({ order }: Props) {
                             We sent a confirmation to{' '}
                             <span className="font-medium">{order.email}</span>.
                         </p>
+                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                            Order reference:{' '}
+                            <span className="font-mono font-medium text-gray-900 dark:text-white">
+                                {order.public_id}
+                            </span>
+                        </p>
                     </div>
 
-                    <Link
-                        href="/products"
-                        className="text-sm text-gray-600 hover:underline dark:text-gray-300"
-                    >
-                        Continue shopping &rarr;
-                    </Link>
+                    <div className="flex flex-col gap-2">
+                        <Button asChild size="sm" variant="outline">
+                            <a
+                                href={`/account/invoices/${order.public_id}`}
+                                download
+                                className="inline-flex"
+                            >
+                                Download invoice (PDF)
+                            </a>
+                        </Button>
+                        <Link
+                            href="/products"
+                            className="text-sm text-gray-600 hover:underline dark:text-gray-300"
+                        >
+                            Continue shopping &rarr;
+                        </Link>
+                    </div>
                 </div>
 
                 <div className="mt-8 grid gap-6">

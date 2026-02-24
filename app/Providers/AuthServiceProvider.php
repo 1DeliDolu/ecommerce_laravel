@@ -3,10 +3,12 @@
 namespace App\Providers;
 
 use App\Models\Category;
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductImage;
 use App\Models\User;
 use App\Policies\CategoryPolicy;
+use App\Policies\OrderPolicy;
 use App\Policies\ProductImagePolicy;
 use App\Policies\ProductPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
@@ -24,6 +26,7 @@ class AuthServiceProvider extends ServiceProvider
         Category::class => CategoryPolicy::class,
         Product::class => ProductPolicy::class,
         ProductImage::class => ProductImagePolicy::class,
+        Order::class => OrderPolicy::class,
     ];
 
     public function boot(): void

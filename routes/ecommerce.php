@@ -1,11 +1,13 @@
 <?php
 
+use App\Http\Controllers\Account\OrderController as AccountOrderController;
 use App\Http\Controllers\Admin\CategoryController as AdminCategoryController;
 use App\Http\Controllers\Admin\ProductController as AdminProductController;
 use App\Http\Controllers\Admin\ProductImageController as AdminProductImageController;
 use App\Http\Controllers\Admin\TrashedProductImageController as AdminTrashedProductImageController;
 use App\Http\Controllers\Shop\CartController as ShopCartController;
 use App\Http\Controllers\Shop\CheckoutController as ShopCheckoutController;
+use App\Http\Controllers\Shop\InvoiceController as ShopInvoiceController;
 use App\Http\Controllers\Shop\ProductController as ShopProductController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -45,9 +47,22 @@ Route::middleware(['auth', 'verified'])
     ->prefix('account')
     ->as('account.')
     ->group(function () {
-        Route::get('orders', fn () => Inertia::render('account/orders/index'))->name('orders.index');
+        Route::get('orders', [AccountOrderController::class, 'index'])->name('orders.index');
         Route::get('addresses', fn () => Inertia::render('account/addresses/index'))->name('addresses.index');
         Route::get('payment-methods', fn () => Inertia::render('account/payment-methods/index'))->name('payment-methods.index');
+
+        /**
+         * Invoice PDF Download
+         * Kullanıcı kendi siparişinin faturasını indirebilir.
+         */
+        Route::get('orders/{order}/invoice', [ShopInvoiceController::class, 'download'])
+            ->name('orders.invoice');
+
+        /**
+         * PublicId ile indirme (success sayfasındaki publicId ile uyumlu)
+         */
+        Route::get('invoices/{publicId}', [ShopInvoiceController::class, 'downloadByPublicId'])
+            ->name('invoices.download');
     });
 
 /*

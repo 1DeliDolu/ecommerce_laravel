@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Shop;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Shop\CheckoutStoreRequest;
+use App\Mail\OrderPlaced;
 use App\Models\Order;
 use App\Models\OrderItem;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -116,6 +118,8 @@ class CheckoutController extends Controller
 
         // ✅ Session cart temizle
         session()->forget('cart');
+
+        Mail::to($order->email)->send(new OrderPlaced($order));
 
         return redirect()->route('shop.checkout.success', ['publicId' => $order->public_id]);
     }
