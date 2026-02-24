@@ -36,7 +36,7 @@ export default function CheckoutSuccess({ order }: Props) {
     useEffect(() => {
         const timer = window.setTimeout(() => {
             router.visit('/', { replace: true });
-        }, 1500);
+        }, 1000);
 
         return () => window.clearTimeout(timer);
     }, []);
