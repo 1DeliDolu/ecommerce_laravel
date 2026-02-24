@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Account\AddressController as AccountAddressController;
 use App\Http\Controllers\Account\OrderController as AccountOrderController;
+use App\Http\Controllers\Account\PaymentMethodController as AccountPaymentMethodController;
 use App\Http\Controllers\Admin\CategoryController as AdminCategoryController;
 use App\Http\Controllers\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Admin\ProductController as AdminProductController;
@@ -51,7 +52,11 @@ Route::middleware(['auth', 'verified'])
     ->group(function () {
         Route::get('orders', [AccountOrderController::class, 'index'])->name('orders.index');
         Route::get('addresses', [AccountAddressController::class, 'index'])->name('addresses.index');
-        Route::get('payment-methods', fn () => Inertia::render('account/payment-methods/index'))->name('payment-methods.index');
+        Route::get('payment-methods', [AccountPaymentMethodController::class, 'index'])->name('payment-methods.index');
+        Route::post('payment-methods', [AccountPaymentMethodController::class, 'store'])->name('payment-methods.store');
+        Route::patch('payment-methods/{paymentMethod}', [AccountPaymentMethodController::class, 'update'])->name('payment-methods.update');
+        Route::delete('payment-methods/{paymentMethod}', [AccountPaymentMethodController::class, 'destroy'])->name('payment-methods.destroy');
+        Route::patch('payment-methods/{paymentMethod}/default', [AccountPaymentMethodController::class, 'setDefault'])->name('payment-methods.default');
 
         /**
          * Invoice PDF Download
