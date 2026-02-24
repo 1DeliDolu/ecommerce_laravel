@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Mail\OrderPlaced;
+use App\Models\Cart;
+use App\Models\CartItem;
 use App\Models\Product;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
@@ -11,6 +13,8 @@ use Tests\TestCase;
 class CheckoutMailTest extends TestCase
 {
     use RefreshDatabase;
+
+    private string $token = 'checkout-mail-test-token-xyz';
 
     private function checkoutPayload(): array
     {
@@ -26,7 +30,7 @@ class CheckoutMailTest extends TestCase
         ];
     }
 
-    private function withCartInSession(): static
+    private function withDbCart(): static
     {
         $product = Product::factory()->create([
             'price' => 29.99,
@@ -34,24 +38,17 @@ class CheckoutMailTest extends TestCase
             'is_active' => true,
         ]);
 
-        $unitPriceCents = (int) round($product->price * 100);
+        $cart = Cart::factory()->create([
+            'token' => $this->token,
+            'user_id' => null,
+            'status' => 'active',
+        ]);
 
-        session()->put('cart', [
-            'items' => [
-                $product->id => [
-                    'product_id' => $product->id,
-                    'name' => $product->name,
-                    'slug' => $product->slug,
-                    'unit_price_cents' => $unitPriceCents,
-                    'qty' => 2,
-                ],
-            ],
-            'summary' => [
-                'items_count' => 2,
-                'unique_items_count' => 1,
-                'subtotal_cents' => $unitPriceCents * 2,
-                'subtotal' => number_format(($unitPriceCents * 2) / 100, 2),
-            ],
+        CartItem::create([
+            'cart_id' => $cart->id,
+            'product_id' => $product->id,
+            'quantity' => 2,
+            'unit_price' => $product->price,
         ]);
 
         return $this;
@@ -61,7 +58,8 @@ class CheckoutMailTest extends TestCase
     {
         Mail::fake();
 
-        $this->withCartInSession()
+        $this->withDbCart()
+            ->withCookie('cart_token', $this->token)
             ->post(route('shop.checkout.store'), $this->checkoutPayload())
             ->assertRedirect();
 
@@ -74,7 +72,8 @@ class CheckoutMailTest extends TestCase
     {
         Mail::fake();
 
-        $this->withCartInSession()
+        $this->withDbCart()
+            ->withCookie('cart_token', $this->token)
             ->post(route('shop.checkout.store'), $this->checkoutPayload());
 
         Mail::assertSentCount(1);
@@ -84,7 +83,8 @@ class CheckoutMailTest extends TestCase
     {
         Mail::fake();
 
-        $this->withCartInSession()
+        $this->withDbCart()
+            ->withCookie('cart_token', $this->token)
             ->post(route('shop.checkout.store'), $this->checkoutPayload());
 
         Mail::assertSent(OrderPlaced::class, function (OrderPlaced $mail) {
@@ -97,7 +97,8 @@ class CheckoutMailTest extends TestCase
     {
         Mail::fake();
 
-        $this->post(route('shop.checkout.store'), $this->checkoutPayload());
+        $this->withCookie('cart_token', $this->token)
+            ->post(route('shop.checkout.store'), $this->checkoutPayload());
 
         Mail::assertNothingSent();
     }
@@ -106,7 +107,8 @@ class CheckoutMailTest extends TestCase
     {
         Mail::fake();
 
-        $this->withCartInSession()
+        $this->withDbCart()
+            ->withCookie('cart_token', $this->token)
             ->post(route('shop.checkout.store'), $this->checkoutPayload());
 
         Mail::assertSent(OrderPlaced::class, function (OrderPlaced $mail) {

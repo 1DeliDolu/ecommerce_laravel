@@ -2,11 +2,14 @@
 
 namespace App\Providers;
 
+use App\Listeners\MergeGuestCart;
 use App\Models\ProductImage;
 use App\Observers\ProductImageObserver;
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -27,6 +30,8 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         ProductImage::observe(ProductImageObserver::class);
+
+        Event::listen(Login::class, MergeGuestCart::class);
 
         Gate::define('access-admin', function ($user): bool {
             $emails = array_filter(array_map('trim', explode(',', (string) env('ADMIN_EMAILS', ''))));

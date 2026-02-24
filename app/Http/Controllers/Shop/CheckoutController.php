@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Shop;
 
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\EnsureCartToken;
 use App\Http\Requests\Shop\CheckoutStoreRequest;
 use App\Mail\OrderPlaced;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Services\CartService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,46 +18,49 @@ use Inertia\Response;
 
 class CheckoutController extends Controller
 {
+    public function __construct(private readonly CartService $cartService) {}
+
     public function index(Request $request): Response
     {
-        $cart = $this->getCart();
-        $items = array_values($cart['items'] ?? []);
+        $cart = $this->cartService->resolve(
+            $request->user(),
+            $request->cookie(EnsureCartToken::COOKIE_NAME),
+        );
 
-        // Summary yoksa (veya bozuksa) yeniden hesapla
-        $summary = $cart['summary'] ?? $this->summarize($cart['items'] ?? []);
-        if (! isset($summary['subtotal_cents'], $summary['items_count'], $summary['unique_items_count'])) {
-            $summary = $this->summarize($cart['items'] ?? []);
-        }
+        $cartData = $cart->exists
+            ? $this->cartService->forInertia($cart)
+            : ['items' => [], 'summary' => $this->emptySummary()];
 
-        return Inertia::render('checkout/index', [
-            'cart' => [
-                'items' => $items,
-                'summary' => $summary,
-            ],
-        ]);
+        return Inertia::render('checkout/index', ['cart' => $cartData]);
     }
 
     public function store(CheckoutStoreRequest $request): RedirectResponse
     {
-        $cart = $this->getCart();
+        $cart = $this->cartService->resolve(
+            $request->user(),
+            $request->cookie(EnsureCartToken::COOKIE_NAME),
+        );
 
-        if (empty($cart['items'])) {
+        if (! $cart->exists) {
             return back()->with('error', 'Your cart is empty.');
         }
 
-        // Summary yoksa hesapla
-        $summary = $cart['summary'] ?? $this->summarize($cart['items']);
-        $subtotalCents = (int) ($summary['subtotal_cents'] ?? 0);
+        $items = $this->cartService->itemsForCheckout($cart);
+
+        if (empty($items)) {
+            return back()->with('error', 'Your cart is empty.');
+        }
+
+        $subtotalCents = array_sum(
+            array_map(fn ($i) => (int) $i['unit_price_cents'] * (int) $i['qty'], $items)
+        );
 
         if ($subtotalCents <= 0) {
             return back()->with('error', 'Your cart is empty.');
         }
 
-        // Şimdilik sabit/hesap (Cart UI ile uyumlu)
         $shippingCents = 500;
-        $taxRate = 0.084;
-
-        $taxCents = (int) round($subtotalCents * $taxRate);
+        $taxCents = (int) round($subtotalCents * 0.084);
         $totalCents = $subtotalCents + $shippingCents + $taxCents;
 
         $user = $request->user();
@@ -63,11 +68,12 @@ class CheckoutController extends Controller
         $order = DB::transaction(function () use (
             $request,
             $user,
-            $cart,
+            $items,
             $subtotalCents,
             $taxCents,
             $shippingCents,
-            $totalCents
+            $totalCents,
+            $cart
         ) {
             /** @var \App\Models\Order $order */
             $order = Order::create([
@@ -92,15 +98,13 @@ class CheckoutController extends Controller
                 'total_cents' => $totalCents,
             ]);
 
-            foreach (($cart['items'] ?? []) as $item) {
-                $qty = (int) ($item['qty'] ?? 0);
-                $unitPriceCents = (int) ($item['unit_price_cents'] ?? 0);
+            foreach ($items as $item) {
+                $qty = (int) $item['qty'];
+                $unitPriceCents = (int) $item['unit_price_cents'];
 
                 if ($qty <= 0 || $unitPriceCents < 0) {
                     continue;
                 }
-
-                $lineTotalCents = $unitPriceCents * $qty;
 
                 OrderItem::create([
                     'order_id' => $order->id,
@@ -109,15 +113,14 @@ class CheckoutController extends Controller
                     'product_slug' => $item['slug'] ?? null,
                     'quantity' => $qty,
                     'unit_price_cents' => $unitPriceCents,
-                    'line_total_cents' => $lineTotalCents,
+                    'line_total_cents' => $unitPriceCents * $qty,
                 ]);
             }
 
+            $this->cartService->clear($cart);
+
             return $order;
         });
-
-        // ✅ Session cart temizle
-        session()->forget('cart');
 
         Mail::to($order->email)->send(new OrderPlaced($order));
 
@@ -131,7 +134,7 @@ class CheckoutController extends Controller
             ->with(['items:id,order_id,product_name,product_slug,quantity,unit_price_cents,line_total_cents'])
             ->firstOrFail();
 
-        // Basit güvenlik: order user’a bağlıysa sadece sahibi görebilsin
+        // Basit güvenlik: order user'a bağlıysa sadece sahibi görebilsin
         if ($order->user_id !== null) {
             $user = $request->user();
             if (! $user || (int) $user->id !== (int) $order->user_id) {
@@ -168,50 +171,14 @@ class CheckoutController extends Controller
         ]);
     }
 
-    private function getCart(): array
+    /** @return array<string,mixed> */
+    private function emptySummary(): array
     {
-        return session()->get('cart', [
-            'items' => [],
-            'summary' => [
-                'items_count' => 0,
-                'unique_items_count' => 0,
-                'subtotal_cents' => 0,
-                'subtotal' => '0.00',
-            ],
-        ]);
-    }
-
-    private function summarize(array $items): array
-    {
-        $itemsCount = 0;
-        $subtotalCents = 0;
-
-        foreach ($items as $item) {
-            $qty = (int) ($item['qty'] ?? 0);
-            $unitPriceCents = (int) ($item['unit_price_cents'] ?? 0);
-
-            $itemsCount += $qty;
-            $subtotalCents += $unitPriceCents * $qty;
-        }
-
         return [
-            'items_count' => $itemsCount,
-            'unique_items_count' => count($items),
-            'subtotal_cents' => $subtotalCents,
-            'subtotal' => $this->centsToDecimal($subtotalCents),
+            'items_count' => 0,
+            'unique_items_count' => 0,
+            'subtotal_cents' => 0,
+            'subtotal' => '0.00',
         ];
-    }
-
-    private function centsToDecimal(int $cents): string
-    {
-        $negative = $cents < 0;
-        $cents = abs($cents);
-
-        $whole = intdiv($cents, 100);
-        $fraction = $cents % 100;
-
-        $formatted = sprintf('%d.%02d', $whole, $fraction);
-
-        return $negative ? '-'.$formatted : $formatted;
     }
 }

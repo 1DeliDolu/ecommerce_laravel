@@ -2,7 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\CartService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -11,6 +13,8 @@ class HandleInertiaRequests extends Middleware
      * The root template that's loaded on the first page visit.
      */
     protected $rootView = 'app';
+
+    public function __construct(private readonly CartService $cartService) {}
 
     /**
      * Determine the current asset version.
@@ -30,6 +34,9 @@ class HandleInertiaRequests extends Middleware
         return array_merge(parent::share($request), [
             'auth' => [
                 'user' => $request->user(),
+                'is_admin' => $request->user()
+                    ? Gate::forUser($request->user())->check('access-admin')
+                    : false,
             ],
 
             'flash' => [
@@ -39,9 +46,20 @@ class HandleInertiaRequests extends Middleware
                 'info' => fn () => $request->session()->get('info'),
             ],
 
-            'cart' => fn () => [
-                'items_count' => (int) data_get($request->session()->get('cart', []), 'summary.items_count', 0),
-            ],
+            'cart' => function () use ($request): array {
+                $cart = $this->cartService->resolve(
+                    $request->user(),
+                    $request->cookie(EnsureCartToken::COOKIE_NAME),
+                );
+
+                if (! $cart->exists) {
+                    return ['items_count' => 0];
+                }
+
+                $itemsCount = $cart->items()->sum('quantity');
+
+                return ['items_count' => (int) $itemsCount];
+            },
         ]);
     }
 }

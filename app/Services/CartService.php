@@ -2,168 +2,218 @@
 
 namespace App\Services;
 
+use App\Models\Cart;
+use App\Models\CartItem;
 use App\Models\Product;
-use Illuminate\Contracts\Session\Session;
+use App\Models\User;
+use Illuminate\Support\Collection;
 
 class CartService
 {
-    public function __construct(private readonly Session $session) {}
-
-    public function get(): array
+    /**
+     * Resolve the active Cart for a user or guest token.
+     * Creates one if it doesn't exist yet.
+     */
+    public function resolve(?User $user, ?string $token): Cart
     {
-        return $this->session->get('cart', $this->emptyCart());
+        // Authenticated user → look for existing user cart
+        if ($user) {
+            // Auto-merge guest cart if a guest token is present
+            if ($token) {
+                $this->mergeGuestIntoUser($user, $token);
+            }
+
+            return Cart::query()
+                ->where('user_id', $user->id)
+                ->where('status', 'active')
+                ->firstOrCreate(
+                    ['user_id' => $user->id, 'status' => 'active'],
+                    ['token' => null],
+                );
+        }
+
+        // Guest → look up by token
+        if ($token) {
+            return Cart::query()->firstOrCreate(
+                ['token' => $token, 'user_id' => null, 'status' => 'active'],
+            );
+        }
+
+        // Fallback: unsaved in-memory cart (token not yet set)
+        return new Cart(['status' => 'active']);
     }
 
-    public function put(array $cart): void
+    /**
+     * Merge a guest cart into a user cart on login.
+     * Guest cart items are moved/merged then the guest cart is deleted.
+     */
+    public function mergeGuestIntoUser(User $user, string $token): void
     {
-        $this->session->put('cart', $cart);
+        $guestCart = Cart::query()
+            ->whereNull('user_id')
+            ->where('token', $token)
+            ->where('status', 'active')
+            ->with('items')
+            ->first();
+
+        if (! $guestCart || $guestCart->items->isEmpty()) {
+            return;
+        }
+
+        $userCart = Cart::query()
+            ->where('user_id', $user->id)
+            ->where('status', 'active')
+            ->with('items')
+            ->firstOrCreate(
+                ['user_id' => $user->id, 'status' => 'active'],
+                ['token' => null],
+            );
+
+        foreach ($guestCart->items as $guestItem) {
+            $existing = $userCart->items->firstWhere('product_id', $guestItem->product_id);
+
+            if ($existing) {
+                $newQty = min(99, $existing->quantity + $guestItem->quantity);
+                $existing->update(['quantity' => $newQty]);
+            } else {
+                CartItem::create([
+                    'cart_id' => $userCart->id,
+                    'product_id' => $guestItem->product_id,
+                    'quantity' => $guestItem->quantity,
+                    'unit_price' => $guestItem->unit_price,
+                ]);
+            }
+        }
+
+        $guestCart->delete();
     }
 
-    public function clear(): void
+    public function add(Cart $cart, Product $product, int $qtyToAdd): void
     {
-        $this->session->forget('cart');
+        $cart->loadMissing('items');
+
+        $existing = $cart->items->firstWhere('product_id', $product->id);
+        $newQty = min(99, ($existing?->quantity ?? 0) + max(1, $qtyToAdd));
+
+        if ($existing) {
+            $existing->update(['quantity' => $newQty]);
+        } else {
+            CartItem::create([
+                'cart_id' => $cart->id,
+                'product_id' => $product->id,
+                'quantity' => $newQty,
+                'unit_price' => $product->price,
+            ]);
+        }
     }
 
-    public function forInertia(): array
+    public function updateQty(Cart $cart, int $productId, int $qty): bool
     {
-        $cart = $this->get();
+        $cart->loadMissing('items');
 
-        return [
-            'items' => array_values($cart['items']),
-            'summary' => $this->summarize($cart['items']),
-        ];
-    }
+        $item = $cart->items->firstWhere('product_id', $productId);
 
-    public function add(Product $product, int $qtyToAdd): array
-    {
-        $cart = $this->get();
-
-        $productId = (int) $product->id;
-        $unitPriceCents = $this->decimalToCents((string) $product->price);
-
-        $existingQty = (int) ($cart['items'][$productId]['qty'] ?? 0);
-        $newQty = min(99, $existingQty + max(1, $qtyToAdd));
-
-        $lineTotalCents = $unitPriceCents * $newQty;
-
-        $cart['items'][$productId] = [
-            'product_id' => $productId,
-            'name' => (string) $product->name,
-            'slug' => (string) $product->slug,
-
-            // snapshot
-            'unit_price_cents' => $unitPriceCents,
-            'unit_price' => $this->centsToDecimal($unitPriceCents),
-
-            'qty' => $newQty,
-
-            'line_total_cents' => $lineTotalCents,
-            'line_total' => $this->centsToDecimal($lineTotalCents),
-        ];
-
-        $cart['summary'] = $this->summarize($cart['items']);
-        $this->put($cart);
-
-        return $cart;
-    }
-
-    public function updateQty(int $productId, int $qty): bool
-    {
-        $cart = $this->get();
-
-        if (! isset($cart['items'][$productId])) {
+        if (! $item) {
             return false;
         }
 
-        $qty = min(99, max(1, $qty));
-
-        $item = $cart['items'][$productId];
-        $unitPriceCents = (int) ($item['unit_price_cents'] ?? 0);
-
-        $item['qty'] = $qty;
-        $item['line_total_cents'] = $unitPriceCents * $qty;
-        $item['line_total'] = $this->centsToDecimal((int) $item['line_total_cents']);
-
-        $cart['items'][$productId] = $item;
-        $cart['summary'] = $this->summarize($cart['items']);
-
-        $this->put($cart);
+        $item->update(['quantity' => min(99, max(1, $qty))]);
 
         return true;
     }
 
-    public function remove(int $productId): void
+    public function remove(Cart $cart, int $productId): void
     {
-        $cart = $this->get();
-
-        unset($cart['items'][$productId]);
-
-        $cart['summary'] = $this->summarize($cart['items']);
-        $this->put($cart);
+        CartItem::query()
+            ->where('cart_id', $cart->id)
+            ->where('product_id', $productId)
+            ->delete();
     }
 
-    public function summarize(array $items): array
+    public function clear(Cart $cart): void
+    {
+        CartItem::query()->where('cart_id', $cart->id)->delete();
+    }
+
+    /**
+     * Return the cart shaped for Inertia / frontend.
+     *
+     * @return array{items: list<array<string,mixed>>, summary: array<string,mixed>}
+     */
+    public function forInertia(Cart $cart): array
+    {
+        $cart->loadMissing(['items.product']);
+
+        $items = $cart->items->map(function (CartItem $item): array {
+            $unitPriceCents = $item->unitPriceCents();
+            $lineTotalCents = $item->lineTotalCents();
+
+            return [
+                'product_id' => $item->product_id,
+                'name' => $item->product?->name ?? 'Unknown product',
+                'slug' => $item->product?->slug ?? '',
+                'unit_price_cents' => $unitPriceCents,
+                'unit_price' => $this->centsToDecimal($unitPriceCents),
+                'qty' => $item->quantity,
+                'line_total_cents' => $lineTotalCents,
+                'line_total' => $this->centsToDecimal($lineTotalCents),
+            ];
+        });
+
+        return [
+            'items' => $items->values()->all(),
+            'summary' => $this->summarizeItems($items),
+        ];
+    }
+
+    /**
+     * Return items keyed by product_id for use in CheckoutController.
+     *
+     * @return array<int, array<string,mixed>>
+     */
+    public function itemsForCheckout(Cart $cart): array
+    {
+        $cart->loadMissing('items');
+
+        $keyed = [];
+        foreach ($cart->items as $item) {
+            $unitPriceCents = $item->unitPriceCents();
+            $keyed[$item->product_id] = [
+                'product_id' => $item->product_id,
+                'name' => $item->product?->name ?? 'Unknown product',
+                'slug' => $item->product?->slug ?? '',
+                'unit_price_cents' => $unitPriceCents,
+                'qty' => $item->quantity,
+            ];
+        }
+
+        return $keyed;
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * @param  Collection<int, array<string,mixed>>  $items
+     * @return array<string,mixed>
+     */
+    private function summarizeItems(Collection $items): array
     {
         $itemsCount = 0;
         $subtotalCents = 0;
 
         foreach ($items as $item) {
-            $qty = (int) ($item['qty'] ?? 0);
-            $unitPriceCents = (int) ($item['unit_price_cents'] ?? 0);
-
-            $itemsCount += $qty;
-            $subtotalCents += $unitPriceCents * $qty;
+            $itemsCount += (int) ($item['qty'] ?? 0);
+            $subtotalCents += (int) ($item['line_total_cents'] ?? 0);
         }
 
         return [
             'items_count' => $itemsCount,
-            'unique_items_count' => count($items),
+            'unique_items_count' => $items->count(),
             'subtotal_cents' => $subtotalCents,
             'subtotal' => $this->centsToDecimal($subtotalCents),
         ];
-    }
-
-    private function emptyCart(): array
-    {
-        return [
-            'items' => [],
-            'summary' => [
-                'items_count' => 0,
-                'unique_items_count' => 0,
-                'subtotal_cents' => 0,
-                'subtotal' => '0.00',
-            ],
-        ];
-    }
-
-    private function decimalToCents(string $value): int
-    {
-        $value = trim($value);
-
-        if ($value === '') {
-            return 0;
-        }
-
-        $negative = str_starts_with($value, '-');
-        if ($negative) {
-            $value = ltrim($value, '-');
-        }
-
-        if (! str_contains($value, '.')) {
-            $cents = ((int) $value) * 100;
-
-            return $negative ? -$cents : $cents;
-        }
-
-        [$whole, $fraction] = explode('.', $value, 2);
-        $whole = $whole === '' ? '0' : $whole;
-
-        $fraction = preg_replace('/\D/', '', $fraction ?? '');
-        $fraction = substr(str_pad($fraction, 2, '0'), 0, 2);
-
-        $cents = ((int) $whole) * 100 + (int) $fraction;
-
-        return $negative ? -$cents : $cents;
     }
 
     private function centsToDecimal(int $cents): string
@@ -171,10 +221,7 @@ class CartService
         $negative = $cents < 0;
         $cents = abs($cents);
 
-        $whole = intdiv($cents, 100);
-        $fraction = $cents % 100;
-
-        $formatted = sprintf('%d.%02d', $whole, $fraction);
+        $formatted = sprintf('%d.%02d', intdiv($cents, 100), $cents % 100);
 
         return $negative ? '-'.$formatted : $formatted;
     }

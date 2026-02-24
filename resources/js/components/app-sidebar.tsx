@@ -1,3 +1,4 @@
+import { usePage } from '@inertiajs/react';
 import { Link } from '@inertiajs/react';
 import {
     BookOpen,
@@ -71,6 +72,9 @@ const footerNavItems: NavItem[] = [
 ];
 
 export function AppSidebar() {
+    const { auth } = usePage().props;
+    const isAdmin = (auth as { is_admin?: boolean }).is_admin === true;
+
     return (
         <Sidebar collapsible="icon">
             <SidebarHeader>
@@ -88,7 +92,7 @@ export function AppSidebar() {
             <SidebarContent>
                 <NavMain label="Platform" items={platformNavItems} />
                 <NavMain label="Account" items={accountNavItems} />
-                <NavMain label="Admin" items={adminNavItems} />
+                {isAdmin && <NavMain label="Admin" items={adminNavItems} />}
             </SidebarContent>
 
             <SidebarFooter>

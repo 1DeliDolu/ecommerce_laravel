@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Account\OrderController as AccountOrderController;
 use App\Http\Controllers\Admin\CategoryController as AdminCategoryController;
+use App\Http\Controllers\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Admin\ProductController as AdminProductController;
 use App\Http\Controllers\Admin\ProductImageController as AdminProductImageController;
 use App\Http\Controllers\Admin\TrashedProductImageController as AdminTrashedProductImageController;
@@ -75,7 +76,10 @@ Route::middleware(['auth', 'verified', 'can:access-admin'])
     ->as('admin.')
     ->group(function () {
         Route::get('overview', fn () => Inertia::render('admin/overview/index'))->name('overview.index');
-        Route::get('orders', fn () => Inertia::render('admin/orders/index'))->name('orders.index');
+
+        Route::get('orders', [AdminOrderController::class, 'index'])->name('orders.index');
+        Route::get('orders/{order}', [AdminOrderController::class, 'show'])->name('orders.show');
+        Route::patch('orders/{order}/status', [AdminOrderController::class, 'updateStatus'])->name('orders.update-status');
 
         Route::resource('categories', AdminCategoryController::class);
         Route::resource('products', AdminProductController::class);
