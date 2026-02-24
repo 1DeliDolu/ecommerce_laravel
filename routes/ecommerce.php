@@ -52,6 +52,10 @@ Route::middleware(['auth', 'verified'])
     ->group(function () {
         Route::get('orders', [AccountOrderController::class, 'index'])->name('orders.index');
         Route::get('addresses', [AccountAddressController::class, 'index'])->name('addresses.index');
+        Route::post('addresses', [AccountAddressController::class, 'store'])->name('addresses.store');
+        Route::patch('addresses/{address}', [AccountAddressController::class, 'update'])->name('addresses.update');
+        Route::delete('addresses/{address}', [AccountAddressController::class, 'destroy'])->name('addresses.destroy');
+        Route::patch('addresses/{address}/default', [AccountAddressController::class, 'setDefault'])->name('addresses.default');
         Route::get('payment-methods', [AccountPaymentMethodController::class, 'index'])->name('payment-methods.index');
         Route::post('payment-methods', [AccountPaymentMethodController::class, 'store'])->name('payment-methods.store');
         Route::patch('payment-methods/{paymentMethod}', [AccountPaymentMethodController::class, 'update'])->name('payment-methods.update');

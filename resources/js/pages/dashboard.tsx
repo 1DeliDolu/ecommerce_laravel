@@ -230,17 +230,19 @@ export default function Dashboard({ stats, filters, categories }: Props) {
                         value={
                             filters.category_id
                                 ? String(filters.category_id)
-                                : ''
+                                : 'all'
                         }
                         onValueChange={(v) =>
-                            applyFilter({ category_id: v ? Number(v) : null })
+                            applyFilter({
+                                category_id: v !== 'all' ? Number(v) : null,
+                            })
                         }
                     >
                         <SelectTrigger className="w-44">
                             <SelectValue placeholder="All categories" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">All categories</SelectItem>
+                            <SelectItem value="all">All categories</SelectItem>
                             {categories.map((c) => (
                                 <SelectItem key={c.id} value={String(c.id)}>
                                     {c.name}

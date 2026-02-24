@@ -36,7 +36,13 @@ class CheckoutController extends Controller
             ? $this->cartService->forInertia($cart)
             : ['items' => [], 'summary' => $this->emptySummary()];
 
-        return Inertia::render('checkout/index', ['cart' => $cartData]);
+        $user = $request->user();
+
+        return Inertia::render('checkout/index', [
+            'cart' => $cartData,
+            'defaultAddress' => $user?->addresses()->where('is_default', true)->first(),
+            'defaultPaymentMethod' => $user?->paymentMethods()->where('is_default', true)->first(),
+        ]);
     }
 
     public function store(CheckoutStoreRequest $request): RedirectResponse

@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Order;
 use App\Models\OrderItem;
+use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -58,7 +58,7 @@ class DashboardController extends Controller
     /**
      * @return array{revenue_cents:int, orders:int, units:int, aov_cents:int}
      */
-    private function kpis(Carbon $from, Carbon $to): array
+    private function kpis(CarbonInterface $from, CarbonInterface $to): array
     {
         $row = Order::query()
             ->whereIn('status', self::REVENUE_STATUSES)
@@ -92,7 +92,7 @@ class DashboardController extends Controller
     /**
      * @return list<array{period:string, revenue_cents:int, orders:int, units:int}>
      */
-    private function revenueOverTime(Carbon $from, Carbon $to, string $granularity): array
+    private function revenueOverTime(CarbonInterface $from, CarbonInterface $to, string $granularity): array
     {
         $periodExpr = $this->periodExpression($granularity);
 
@@ -132,7 +132,7 @@ class DashboardController extends Controller
     /**
      * @return list<array{product_id:int|null, name:string, units:int, revenue_cents:int}>
      */
-    private function topProducts(Carbon $from, Carbon $to, int $limit = 10): array
+    private function topProducts(CarbonInterface $from, CarbonInterface $to, int $limit = 10): array
     {
         return OrderItem::query()
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
@@ -165,7 +165,7 @@ class DashboardController extends Controller
     /**
      * @return list<array{period:string, categories:array<string,int>}>
      */
-    private function categoryPerformance(Carbon $from, Carbon $to, string $granularity): array
+    private function categoryPerformance(CarbonInterface $from, CarbonInterface $to, string $granularity): array
     {
         $periodExpr = $this->periodExpression($granularity);
 
@@ -202,7 +202,7 @@ class DashboardController extends Controller
     /**
      * @return list<array{product_id:int|null, name:string, units:int, revenue_cents:int}>
      */
-    private function categoryDrilldown(int $categoryId, Carbon $from, Carbon $to): array
+    private function categoryDrilldown(int $categoryId, CarbonInterface $from, CarbonInterface $to): array
     {
         return OrderItem::query()
             ->join('orders', 'orders.id', '=', 'order_items.order_id')

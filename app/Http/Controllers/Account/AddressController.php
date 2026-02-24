@@ -3,9 +3,10 @@
 namespace App\Http\Controllers\Account;
 
 use App\Http\Controllers\Controller;
-use App\Models\Order;
+use App\Http\Requests\Account\AddressRequest;
+use App\Models\UserAddress;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -13,36 +14,69 @@ class AddressController extends Controller
 {
     public function index(Request $request): Response
     {
-        $addresses = Order::query()
-            ->where('user_id', $request->user()->id)
-            ->whereNotNull('address1')
-            ->select([
-                'first_name',
-                'last_name',
-                'address1',
-                'address2',
-                'city',
-                'postal_code',
-                'country',
-                DB::raw('COUNT(*) as order_count'),
-                DB::raw('MAX(created_at) as last_used_at'),
-            ])
-            ->groupBy('first_name', 'last_name', 'address1', 'address2', 'city', 'postal_code', 'country')
-            ->orderByDesc('last_used_at')
-            ->get()
-            ->map(fn ($row) => [
-                'full_name' => trim("{$row->first_name} {$row->last_name}"),
-                'address1' => $row->address1,
-                'address2' => $row->address2,
-                'city' => $row->city,
-                'postal_code' => $row->postal_code,
-                'country' => $row->country,
-                'order_count' => (int) $row->order_count,
-                'last_used_at' => $row->last_used_at,
-            ]);
+        $addresses = $request->user()
+            ->addresses()
+            ->orderByDesc('is_default')
+            ->orderByDesc('created_at')
+            ->get();
 
         return Inertia::render('account/addresses/index', [
             'addresses' => $addresses,
         ]);
+    }
+
+    public function store(AddressRequest $request): RedirectResponse
+    {
+        $user = $request->user();
+        $data = $request->validated();
+
+        if (! $user->addresses()->exists()) {
+            $data['is_default'] = true;
+        }
+
+        $user->addresses()->create($data);
+
+        return back()->with('success', 'Address saved.');
+    }
+
+    public function update(AddressRequest $request, UserAddress $address): RedirectResponse
+    {
+        $this->authorizeOwnership($request, $address);
+
+        $address->update($request->validated());
+
+        return back()->with('success', 'Address updated.');
+    }
+
+    public function destroy(Request $request, UserAddress $address): RedirectResponse
+    {
+        $this->authorizeOwnership($request, $address);
+
+        $address->delete();
+
+        if ($address->is_default) {
+            $request->user()
+                ->addresses()
+                ->latest()
+                ->first()
+                ?->update(['is_default' => true]);
+        }
+
+        return back()->with('success', 'Address removed.');
+    }
+
+    public function setDefault(Request $request, UserAddress $address): RedirectResponse
+    {
+        $this->authorizeOwnership($request, $address);
+
+        $request->user()->addresses()->update(['is_default' => false]);
+        $address->update(['is_default' => true]);
+
+        return back()->with('success', 'Default address updated.');
+    }
+
+    private function authorizeOwnership(Request $request, UserAddress $address): void
+    {
+        abort_unless($address->user_id === $request->user()->id, 403);
     }
 }

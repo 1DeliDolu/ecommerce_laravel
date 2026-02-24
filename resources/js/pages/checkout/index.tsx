@@ -51,6 +51,25 @@ type Props = {
         items: CartItem[];
         summary: CartSummary;
     };
+    defaultAddress?: {
+        id: number;
+        first_name: string;
+        last_name: string;
+        phone: string | null;
+        address1: string;
+        address2: string | null;
+        city: string;
+        postal_code: string;
+        country: string;
+    } | null;
+    defaultPaymentMethod?: {
+        id: number;
+        brand: string;
+        last4: string;
+        cardholder_name: string;
+        exp_month: number;
+        exp_year: number;
+    } | null;
 };
 
 type CheckoutForm = {
@@ -84,7 +103,11 @@ function formatMoneyFromCents(cents: number) {
     return value.toFixed(2);
 }
 
-export default function CheckoutIndex({ cart }: Props) {
+export default function CheckoutIndex({
+    cart,
+    defaultAddress,
+    defaultPaymentMethod,
+}: Props) {
     const { props } = usePage<PageProps>();
     const flashError = props.error ?? props.flash?.error;
     const flashSuccess = props.success ?? props.flash?.success;
@@ -124,20 +147,24 @@ export default function CheckoutIndex({ cart }: Props) {
         email: '',
 
         payment_method: 'card',
-        card_name: '',
-        card_number: '',
-        card_expiry: '',
+        card_name: defaultPaymentMethod?.cardholder_name ?? '',
+        card_number: defaultPaymentMethod
+            ? `•••• •••• •••• ${defaultPaymentMethod.last4}`
+            : '',
+        card_expiry: defaultPaymentMethod
+            ? `${String(defaultPaymentMethod.exp_month).padStart(2, '0')}/${defaultPaymentMethod.exp_year}`
+            : '',
         card_cvc: '',
 
-        first_name: '',
-        last_name: '',
+        first_name: defaultAddress?.first_name ?? '',
+        last_name: defaultAddress?.last_name ?? '',
         company: '',
-        address1: '',
-        address2: '',
-        city: '',
+        address1: defaultAddress?.address1 ?? '',
+        address2: defaultAddress?.address2 ?? '',
+        city: defaultAddress?.city ?? '',
         state: '',
-        postal_code: '',
-        country: 'Germany',
+        postal_code: defaultAddress?.postal_code ?? '',
+        country: defaultAddress?.country ?? 'Germany',
 
         billing_same_as_shipping: true,
     });
