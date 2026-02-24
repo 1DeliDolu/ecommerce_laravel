@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\ProductController as AdminProductController;
 use App\Http\Controllers\Admin\ProductImageController as AdminProductImageController;
 use App\Http\Controllers\Admin\TrashedProductImageController as AdminTrashedProductImageController;
 use App\Http\Controllers\Shop\CartController as ShopCartController;
+use App\Http\Controllers\Shop\CheckoutController as ShopCheckoutController;
 use App\Http\Controllers\Shop\ProductController as ShopProductController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -23,6 +24,10 @@ Route::prefix('cart')
         Route::delete('items/{productId}', [ShopCartController::class, 'destroy'])->name('destroy');
         Route::delete('/', [ShopCartController::class, 'clear'])->name('clear');
     });
+
+Route::get('checkout', [ShopCheckoutController::class, 'index'])->name('shop.checkout.index');
+Route::post('checkout', [ShopCheckoutController::class, 'store'])->name('shop.checkout.store');
+Route::get('checkout/success/{publicId}', [ShopCheckoutController::class, 'success'])->name('shop.checkout.success');
 
 Route::prefix('products')
     ->as('shop.products.')
