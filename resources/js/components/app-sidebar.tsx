@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import {
     BookOpen,
     CreditCard,
@@ -8,6 +8,7 @@ import {
     Package,
     Receipt,
     ShoppingBag,
+    Trash2,
     Tags,
     Folder,
 } from 'lucide-react';
@@ -26,9 +27,14 @@ import {
 } from '@/components/ui/sidebar';
 
 import { toUrl } from '@/lib/utils';
-import type { NavItem } from '@/types';
+import type { Auth, NavItem } from '@/types';
 import AppLogo from '@/components/app-logo';
 import { dashboard } from '@/routes';
+import { index as adminCategoriesIndex } from '@/routes/admin/categories';
+import { index as adminOrdersIndex } from '@/routes/admin/orders';
+import { index as adminOverviewIndex } from '@/routes/admin/overview';
+import { trashed as adminProductImagesTrashed } from '@/routes/admin/product-images';
+import { index as adminProductsIndex } from '@/routes/admin/products';
 
 const platformNavItems: NavItem[] = [
     { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
@@ -45,10 +51,15 @@ const accountNavItems: NavItem[] = [
 ];
 
 const adminNavItems: NavItem[] = [
-    { title: 'Overview', href: '/admin/overview', icon: Gauge },
-    { title: 'Categories', href: '/admin/categories', icon: Tags },
-    { title: 'Products', href: '/admin/products', icon: Package },
-    { title: 'Orders', href: '/admin/orders', icon: ShoppingBag },
+    { title: 'Overview', href: adminOverviewIndex(), icon: Gauge },
+    { title: 'Categories', href: adminCategoriesIndex(), icon: Tags },
+    { title: 'Products', href: adminProductsIndex(), icon: Package },
+    { title: 'Orders', href: adminOrdersIndex(), icon: ShoppingBag },
+    {
+        title: 'Trashed Images',
+        href: adminProductImagesTrashed(),
+        icon: Trash2,
+    },
 ];
 
 const footerNavItems: NavItem[] = [
@@ -65,6 +76,9 @@ const footerNavItems: NavItem[] = [
 ];
 
 export function AppSidebar() {
+    const { auth } = usePage<{ auth: Auth }>().props;
+    const canAccessAdmin = auth?.can.access_admin === true;
+
     return (
         <Sidebar collapsible="icon">
             <SidebarHeader>
@@ -82,7 +96,7 @@ export function AppSidebar() {
             <SidebarContent>
                 <NavMain label="Platform" items={platformNavItems} />
                 <NavMain label="Account" items={accountNavItems} />
-                <NavMain label="Admin" items={adminNavItems} />
+                {canAccessAdmin && <NavMain label="Admin" items={adminNavItems} />}
             </SidebarContent>
 
             <SidebarFooter>

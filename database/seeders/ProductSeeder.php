@@ -23,10 +23,16 @@ class ProductSeeder extends Seeder
             ->count(60)
             ->create()
             ->each(function (Product $product) use ($categoryIds) {
-                // Attach 1-3 random categories
-                $product->categories()->sync(
-                    collect($categoryIds)->shuffle()->take(rand(1, 3))->values()->all()
-                );
+                $attachedCategoryIds = collect($categoryIds)
+                    ->shuffle()
+                    ->take(rand(1, 3))
+                    ->values()
+                    ->all();
+
+                $product->categories()->sync($attachedCategoryIds);
+                $product->update([
+                    'primary_category_id' => $attachedCategoryIds[0] ?? null,
+                ]);
 
                 // Create images (1 primary + 1-5 additional)
                 $total = rand(2, 6);

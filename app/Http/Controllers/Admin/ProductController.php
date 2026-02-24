@@ -7,6 +7,8 @@ use App\Models\Category;
 use App\Models\Product;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -14,11 +16,17 @@ use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
-class ProductController extends Controller
+class ProductController extends Controller implements HasMiddleware
 {
-    public function __construct()
+    public static function middleware(): array
     {
-        $this->authorizeResource(Product::class, 'product');
+        return [
+            new Middleware('can:viewAny,'.Product::class, only: ['index']),
+            new Middleware('can:create,'.Product::class, only: ['create', 'store']),
+            new Middleware('can:view,product', only: ['show']),
+            new Middleware('can:update,product', only: ['edit', 'update']),
+            new Middleware('can:delete,product', only: ['destroy']),
+        ];
     }
 
     public function index(Request $request): Response
@@ -94,6 +102,7 @@ class ProductController extends Controller
                 'compare_at_price',
                 'sku',
                 'stock',
+                'primary_category_id',
                 'is_active',
             ]);
 
@@ -102,6 +111,7 @@ class ProductController extends Controller
                 : $productData['name'];
 
             $productData['slug'] = $this->makeUniqueSlug($baseSlug);
+            $productData['primary_category_id'] = $this->resolvePrimaryCategoryId($validated);
 
             /** @var Product $product */
             $product = Product::query()->create($productData);
@@ -163,6 +173,7 @@ class ProductController extends Controller
                 'compare_at_price',
                 'sku',
                 'stock',
+                'primary_category_id',
                 'is_active',
             ]);
 
@@ -172,6 +183,8 @@ class ProductController extends Controller
             } else {
                 unset($productData['slug']);
             }
+
+            $productData['primary_category_id'] = $this->resolvePrimaryCategoryId($validated);
 
             $product->update($productData);
 
@@ -237,6 +250,7 @@ class ProductController extends Controller
             // Categories (pivot)
             'category_ids' => ['required', 'array', 'min:1'],
             'category_ids.*' => ['integer', Rule::exists('categories', 'id')],
+            'primary_category_id' => ['nullable', 'integer', Rule::exists('categories', 'id')],
 
             // Images (optional for now; later we will handle uploads)
             'images' => ['sometimes', 'array'],
@@ -246,6 +260,20 @@ class ProductController extends Controller
             'images.*.sort_order' => ['nullable', 'integer', 'min:0'],
             'images.*.is_primary' => ['nullable', 'boolean'],
         ]);
+    }
+
+    private function resolvePrimaryCategoryId(array $validated): int
+    {
+        $categoryIds = array_values(array_map('intval', $validated['category_ids']));
+        $requestedPrimary = isset($validated['primary_category_id'])
+            ? (int) $validated['primary_category_id']
+            : null;
+
+        if ($requestedPrimary !== null && in_array($requestedPrimary, $categoryIds, true)) {
+            return $requestedPrimary;
+        }
+
+        return $categoryIds[0];
     }
 
     private function makeUniqueSlug(string $value, ?int $ignoreId = null): string

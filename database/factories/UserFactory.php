@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\CustomerTier;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -23,10 +24,19 @@ class UserFactory extends Factory
      */
     public function definition(): array
     {
+        $roll = fake()->numberBetween(1, 100);
+        $tier = match (true) {
+            $roll <= 5 => CustomerTier::Platinum,
+            $roll <= 20 => CustomerTier::Gold,
+            $roll <= 50 => CustomerTier::Silver,
+            default => CustomerTier::Bronze,
+        };
+
         return [
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
+            'tier' => $tier->value,
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
             'two_factor_secret' => null,
@@ -54,6 +64,34 @@ class UserFactory extends Factory
             'two_factor_secret' => encrypt('secret'),
             'two_factor_recovery_codes' => encrypt(json_encode(['recovery-code-1'])),
             'two_factor_confirmed_at' => now(),
+        ]);
+    }
+
+    public function platinum(): static
+    {
+        return $this->state(fn (): array => [
+            'tier' => CustomerTier::Platinum->value,
+        ]);
+    }
+
+    public function gold(): static
+    {
+        return $this->state(fn (): array => [
+            'tier' => CustomerTier::Gold->value,
+        ]);
+    }
+
+    public function silver(): static
+    {
+        return $this->state(fn (): array => [
+            'tier' => CustomerTier::Silver->value,
+        ]);
+    }
+
+    public function bronze(): static
+    {
+        return $this->state(fn (): array => [
+            'tier' => CustomerTier::Bronze->value,
         ]);
     }
 }
