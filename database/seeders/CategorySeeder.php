@@ -49,7 +49,5 @@ class CategorySeeder extends Seeder
             }
         }
 
-        // Some extra random categories for pagination/testing
-        Category::factory()->count(10)->create();
     }
 }
