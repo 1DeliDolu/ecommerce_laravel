@@ -1,5 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import CartBadge from '@/components/cart/cart-badge';
+import { useCartCount } from '@/hooks/use-cart-count';
 import { dashboard, login, register } from '@/routes';
 
 type Props = {
@@ -9,8 +10,7 @@ type Props = {
 export default function MarketingNav({ canRegister = true }: Props) {
     const page = usePage();
     const { auth } = page.props;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const cartCount = (page.props as any)?.cart?.items_count ?? 0;
+    const { count: cartCount } = useCartCount();
 
     const baseLink =
         'inline-flex items-center rounded-sm px-4 py-1.5 text-sm leading-normal transition';
