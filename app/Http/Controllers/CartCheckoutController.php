@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreCheckoutRequest;
+use App\Mail\OrderPlaced;
 use App\Models\Order;
 use App\Models\Product;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -155,6 +157,8 @@ class CartCheckoutController extends Controller
 
             return $order;
         });
+
+        Mail::to($order->email)->send(new OrderPlaced($order));
 
         $message = sprintf('Order %s placed successfully.', $order->public_id);
 

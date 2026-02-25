@@ -27,7 +27,7 @@ class AddressFactory extends Factory
             'last_name' => $this->faker->lastName(),
             'phone' => $this->faker->optional(0.7)->phoneNumber(),
             'line1' => $this->faker->streetAddress(),
-            'line2' => $this->faker->optional(0.2)->secondaryAddress(),
+            'line2' => $this->faker->optional(0.2)->bothify('Apt ##?'),
             'city' => $this->faker->city(),
             'state' => $this->faker->optional(0.8)->state(),
             'postal_code' => $this->faker->postcode(),

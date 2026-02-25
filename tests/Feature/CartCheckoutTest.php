@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Mail\OrderPlaced;
 use App\Models\Address;
 use App\Models\Order;
 use App\Models\PaymentMethod;
@@ -9,6 +10,7 @@ use App\Models\Product;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -19,6 +21,8 @@ class CartCheckoutTest extends TestCase
 
     public function test_guest_can_complete_checkout_with_manual_payment_details(): void
     {
+        Mail::fake();
+
         $product = Product::factory()->create([
             'name' => 'Trail Pack',
             'slug' => 'trail-pack',
@@ -64,6 +68,11 @@ class CartCheckoutTest extends TestCase
             'id' => $product->id,
             'stock' => 8,
         ]);
+
+        Mail::assertSent(OrderPlaced::class, function (OrderPlaced $mail) use ($order): bool {
+            return $mail->hasTo('john@example.test')
+                && $mail->order->is($order);
+        });
     }
 
     public function test_checkout_persists_selected_options_for_each_variant_line(): void
