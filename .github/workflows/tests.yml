@@ -52,5 +52,5 @@ jobs:
       - name: Build Assets
         run: npm run build
 
-      - name: Tests
-        run: ./vendor/bin/phpunit
+      - name: Execute tests (Unit and Feature tests) via PHPUnit/Pest
+        run: php artisan test
