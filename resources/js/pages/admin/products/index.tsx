@@ -124,7 +124,7 @@ export default function Index({ products, categories, filters, catalog_options }
     // Keep local state in sync when navigation happens (e.g. back/forward).
     useEffect(() => {
         setLocal(filters);
-    }, [filters.q, filters.status, filters.category, filters.stock, filters.brand, filters.model, filters.product_type]);
+    }, [filters]);
 
     const categoryOptions = useMemo(() => {
         // Simple flat list; later we can render nested (parent/child).

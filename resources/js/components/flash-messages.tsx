@@ -1,6 +1,6 @@
 import { usePage } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -35,11 +35,9 @@ export default function FlashMessages({ className = '' }: Props) {
     }, [flash]);
 
     const [dismissed, setDismissed] = useState<Record<string, boolean>>({});
-
-    useEffect(() => {
-        // new flash => reset dismiss state
-        setDismissed({});
-    }, [flash?.success, flash?.error, flash?.warning, flash?.info]);
+    const flashKey = useMemo(() => {
+        return messages.map((message) => `${message.type}:${message.text}`).join('|');
+    }, [messages]);
 
     if (messages.length === 0) return null;
 
@@ -62,7 +60,7 @@ export default function FlashMessages({ className = '' }: Props) {
         <div className={className}>
             <div className="space-y-2">
                 {messages.map((m, idx) => {
-                    const key = `${m.type}-${idx}`;
+                    const key = `${flashKey}-${m.type}-${idx}`;
                     if (dismissed[key]) return null;
 
                     const isError = m.type === 'error';

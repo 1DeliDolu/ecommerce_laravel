@@ -1,6 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Search, ShoppingCart, SlidersHorizontal, Tag } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/hooks/use-cart';
 import MarketingLayout from '@/layouts/marketing-layout';
@@ -113,21 +113,6 @@ export default function ShopIndex({ products, categories, filter_options, filter
         min_price: filters.min_price !== null ? String(filters.min_price) : '',
         max_price: filters.max_price !== null ? String(filters.max_price) : '',
     });
-
-    useEffect(() => {
-        setFilterForm({
-            category: filters.category ?? '',
-            search: filters.search ?? '',
-            brand: filters.brand ?? '',
-            model: filters.model ?? '',
-            color: filters.color ?? '',
-            product_type: filters.product_type ?? '',
-            clothing_size: filters.clothing_size ?? '',
-            shoe_size: filters.shoe_size ?? '',
-            min_price: filters.min_price !== null ? String(filters.min_price) : '',
-            max_price: filters.max_price !== null ? String(filters.max_price) : '',
-        });
-    }, [filters.category, filters.search, filters.brand, filters.model, filters.color, filters.product_type, filters.clothing_size, filters.shoe_size, filters.min_price, filters.max_price]);
 
     const formatMoney = (price: number): string => {
         return new Intl.NumberFormat('en-US', {
