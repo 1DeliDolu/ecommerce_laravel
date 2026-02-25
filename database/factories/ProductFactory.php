@@ -41,6 +41,13 @@ class ProductFactory extends Factory
 
             'stock' => $this->faker->numberBetween(0, 500),
             'is_active' => $this->faker->boolean(90),
+<<<<<<< Updated upstream
+=======
+            'primary_category_id' => Category::query()
+                ->whereNotNull('parent_id')
+                ->inRandomOrder()
+                ->value('id'),
+>>>>>>> Stashed changes
         ];
     }
 
