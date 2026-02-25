@@ -1,54 +1,48 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import {
-    BarChart3,
     BookOpen,
     CreditCard,
-    Folder,
+    Gauge,
     LayoutGrid,
     MapPin,
     Package,
+    Receipt,
     ShoppingBag,
+    Trash2,
     Tags,
+    Folder,
 } from 'lucide-react';
 
 import { NavFooter } from '@/components/nav-footer';
+import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
     Sidebar,
     SidebarContent,
     SidebarFooter,
-    SidebarGroup,
-    SidebarGroupContent,
-    SidebarGroupLabel,
     SidebarHeader,
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { useCurrentUrl } from '@/hooks/use-current-url';
-import { dashboard } from '@/routes';
-import type { NavItem } from '@/types';
-import AppLogo from './app-logo';
+
+import { toUrl } from '@/lib/utils';
+import type { Auth, NavItem } from '@/types';
+import AppLogo from '@/components/app-logo';
+import { dashboard, home } from '@/routes';
+import { index as adminCategoriesIndex } from '@/routes/admin/categories';
+import { index as adminOrdersIndex } from '@/routes/admin/orders';
+import { index as adminOverviewIndex } from '@/routes/admin/overview';
+import { trashed as adminProductImagesTrashed } from '@/routes/admin/product-images';
+import { index as adminProductsIndex } from '@/routes/admin/products';
 
 const platformNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
+    { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
 ];
 
 const accountNavItems: NavItem[] = [
-    {
-        title: 'Orders',
-        href: '/account/orders',
-        icon: ShoppingBag,
-    },
-    {
-        title: 'Addresses',
-        href: '/account/addresses',
-        icon: MapPin,
-    },
+    { title: 'Orders', href: '/account/orders', icon: Receipt },
+    { title: 'Addresses', href: '/account/addresses', icon: MapPin },
     {
         title: 'Payment Methods',
         href: '/account/payment-methods',
@@ -57,25 +51,14 @@ const accountNavItems: NavItem[] = [
 ];
 
 const adminNavItems: NavItem[] = [
+    { title: 'Overview', href: adminOverviewIndex(), icon: Gauge },
+    { title: 'Categories', href: adminCategoriesIndex(), icon: Tags },
+    { title: 'Products', href: adminProductsIndex(), icon: Package },
+    { title: 'Orders', href: adminOrdersIndex(), icon: ShoppingBag },
     {
-        title: 'Overview',
-        href: '/admin',
-        icon: BarChart3,
-    },
-    {
-        title: 'Categories',
-        href: '/admin/categories',
-        icon: Tags,
-    },
-    {
-        title: 'Products',
-        href: '/admin/products',
-        icon: Package,
-    },
-    {
-        title: 'Orders',
-        href: '/admin/orders',
-        icon: ShoppingBag,
+        title: 'Trashed Images',
+        href: adminProductImagesTrashed(),
+        icon: Trash2,
     },
 ];
 
@@ -92,42 +75,17 @@ const footerNavItems: NavItem[] = [
     },
 ];
 
-function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
-    const { isCurrentUrl } = useCurrentUrl();
-
-    return (
-        <SidebarGroup>
-            <SidebarGroupLabel>{label}</SidebarGroupLabel>
-            <SidebarGroupContent>
-                <SidebarMenu>
-                    {items.map((item) => (
-                        <SidebarMenuItem key={item.title}>
-                            <SidebarMenuButton
-                                asChild
-                                isActive={isCurrentUrl(item.href)}
-                                tooltip={item.title}
-                            >
-                                <Link href={item.href} prefetch>
-                                    {item.icon && <item.icon />}
-                                    <span>{item.title}</span>
-                                </Link>
-                            </SidebarMenuButton>
-                        </SidebarMenuItem>
-                    ))}
-                </SidebarMenu>
-            </SidebarGroupContent>
-        </SidebarGroup>
-    );
-}
-
 export function AppSidebar() {
+    const { auth } = usePage<{ auth: Auth }>().props;
+    const canAccessAdmin = auth?.can.access_admin === true;
+
     return (
-        <Sidebar collapsible="icon" variant="inset">
+        <Sidebar collapsible="icon">
             <SidebarHeader>
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
-                            <Link href={dashboard()} prefetch>
+                            <Link href={toUrl(home())}>
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>
@@ -136,13 +94,13 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavGroup label="Platform" items={platformNavItems} />
-                <NavGroup label="Account" items={accountNavItems} />
-                <NavGroup label="Admin" items={adminNavItems} />
+                <NavMain label="Platform" items={platformNavItems} />
+                <NavMain label="Account" items={accountNavItems} />
+                {canAccessAdmin && <NavMain label="Admin" items={adminNavItems} />}
             </SidebarContent>
 
             <SidebarFooter>
-                <NavFooter items={footerNavItems} className="mt-auto" />
+                <NavFooter items={footerNavItems} />
                 <NavUser />
             </SidebarFooter>
         </Sidebar>

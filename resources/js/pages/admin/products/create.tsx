@@ -13,9 +13,17 @@ type Category = {
 
 type Props = {
     categories: Category[];
+    catalog_options: {
+        brands: string[];
+        models: string[];
+        colors: string[];
+        product_types: string[];
+        clothing_sizes: string[];
+        shoe_sizes: string[];
+    };
 };
 
-export default function Create({ categories }: Props) {
+export default function Create({ categories, catalog_options }: Props) {
     return (
         <AppLayout>
             <Head title="Create Product" />
@@ -45,6 +53,7 @@ export default function Create({ categories }: Props) {
                     <ProductForm
                         mode="create"
                         categories={categories}
+                        catalogOptions={catalog_options}
                         submitUrl="/admin/products"
                     />
                 </div>

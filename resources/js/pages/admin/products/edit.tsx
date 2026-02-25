@@ -16,6 +16,7 @@ type ProductImage = {
     product_id: number;
     disk: string;
     path: string;
+    image_url?: string | null;
     alt: string | null;
     sort_order: number;
     is_primary: boolean;
@@ -24,6 +25,13 @@ type ProductImage = {
 type Product = {
     id: number;
     name: string;
+    brand: string | null;
+    model_name: string | null;
+    product_type: string | null;
+    color: string | null;
+    material: string | null;
+    available_clothing_sizes: string[] | null;
+    available_shoe_sizes: string[] | null;
     slug: string;
     sku: string | null;
     description: string | null;
@@ -39,15 +47,31 @@ type Props = {
     product: Product;
     categories: Category[];
     selectedCategoryIds: number[];
+    catalog_options: {
+        brands: string[];
+        models: string[];
+        colors: string[];
+        product_types: string[];
+        clothing_sizes: string[];
+        shoe_sizes: string[];
+    };
 };
 
 export default function Edit({
     product,
     categories,
     selectedCategoryIds,
+    catalog_options,
 }: Props) {
     const initialValues = {
         name: product.name,
+        brand: product.brand ?? '',
+        model_name: product.model_name ?? '',
+        product_type: product.product_type ?? '',
+        color: product.color ?? '',
+        material: product.material ?? '',
+        available_clothing_sizes: product.available_clothing_sizes ?? [],
+        available_shoe_sizes: product.available_shoe_sizes ?? [],
         slug: '', // IMPORTANT: do not overwrite slug unless admin explicitly types one
         description: product.description ?? '',
         price: product.price,
@@ -62,6 +86,7 @@ export default function Edit({
             .map((img) => ({
                 disk: img.disk,
                 path: img.path,
+                image_url: img.image_url ?? null,
                 alt: img.alt ?? '',
                 sort_order: img.sort_order,
                 is_primary: img.is_primary,
@@ -104,6 +129,7 @@ export default function Edit({
                     <ProductForm
                         mode="edit"
                         categories={categories}
+                        catalogOptions={catalog_options}
                         submitUrl={`/admin/products/${product.slug}`}
                         method="put"
                         initialValues={initialValues}

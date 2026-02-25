@@ -26,6 +26,9 @@ type Product = {
     name: string;
     slug: string;
     sku: string | null;
+    brand: string | null;
+    model_name: string | null;
+    product_type: string | null;
     price: string; // casted as decimal:2 on backend, comes as string
     compare_at_price: string | null;
     stock: number;
@@ -59,16 +62,44 @@ type Filters = {
     status: 'all' | 'active' | 'inactive';
     category: string; // category slug
     stock: 'all' | 'in' | 'out';
+    brand: string;
+    model: string;
+    product_type: string;
 };
 
 type Props = {
     products: Paginator<Product>;
     categories: Category[];
     filters: Filters;
+    catalog_options: {
+        product_types: string[];
+        clothing_sizes: string[];
+        shoe_sizes: string[];
+    };
 };
 
 function stripHtml(input: string): string {
     return input.replace(/<[^>]*>/g, '').trim();
+}
+
+function resolveImageUrl(image: ProductImage | null): string | null {
+    if (!image || image.path.trim() === '') {
+        return null;
+    }
+
+    if (image.path.startsWith('http://') || image.path.startsWith('https://')) {
+        return image.path;
+    }
+
+    if (image.path.startsWith('/')) {
+        return image.path;
+    }
+
+    if (image.disk === 'public' || image.disk.trim() === '') {
+        return `/storage/${image.path.replace(/^\/+/, '')}`;
+    }
+
+    return null;
 }
 
 function buildQuery(filters: Filters) {
@@ -77,6 +108,9 @@ function buildQuery(filters: Filters) {
         status: filters.status || 'all',
         category: filters.category || '',
         stock: filters.stock || 'all',
+        brand: filters.brand || '',
+        model: filters.model || '',
+        product_type: filters.product_type || '',
     };
 }
 
@@ -84,13 +118,13 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Products', href: '/admin/products' },
 ];
 
-export default function Index({ products, categories, filters }: Props) {
+export default function Index({ products, categories, filters, catalog_options }: Props) {
     const [local, setLocal] = useState<Filters>(filters);
 
     // Keep local state in sync when navigation happens (e.g. back/forward).
     useEffect(() => {
         setLocal(filters);
-    }, [filters.q, filters.status, filters.category, filters.stock]);
+    }, [filters.q, filters.status, filters.category, filters.stock, filters.brand, filters.model, filters.product_type]);
 
     const categoryOptions = useMemo(() => {
         // Simple flat list; later we can render nested (parent/child).
@@ -172,7 +206,7 @@ export default function Index({ products, categories, filters }: Props) {
                                         q: e.target.value,
                                     }))
                                 }
-                                placeholder="Name, slug or SKU…"
+                                placeholder="Name, slug, SKU, brand or model..."
                                 className="w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background outline-none focus:ring-2 focus:ring-ring"
                             />
                         </div>
@@ -242,6 +276,63 @@ export default function Index({ products, categories, filters }: Props) {
                             </select>
                         </div>
 
+                        <div>
+                            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                                Brand
+                            </label>
+                            <input
+                                value={local.brand}
+                                onChange={(e) =>
+                                    applyFilters({
+                                        ...local,
+                                        brand: e.target.value,
+                                    })
+                                }
+                                placeholder="e.g. Nike"
+                                className="w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background outline-none focus:ring-2 focus:ring-ring"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                                Model
+                            </label>
+                            <input
+                                value={local.model}
+                                onChange={(e) =>
+                                    applyFilters({
+                                        ...local,
+                                        model: e.target.value,
+                                    })
+                                }
+                                placeholder="e.g. Pegasus 41"
+                                className="w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background outline-none focus:ring-2 focus:ring-ring"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                                Product type
+                            </label>
+                            <select
+                                value={local.product_type}
+                                onChange={(e) =>
+                                    applyFilters({
+                                        ...local,
+                                        product_type: e.target.value,
+                                    })
+                                }
+                                className="w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background outline-none focus:ring-2 focus:ring-ring"
+                            >
+                                <option value="">All types</option>
+                                {catalog_options.product_types.map((productType) => (
+                                    <option key={productType} value={productType}>
+                                        {productType}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
                         <div className="flex items-end gap-2 md:col-span-2">
                             <button
                                 type="button"
@@ -251,6 +342,9 @@ export default function Index({ products, categories, filters }: Props) {
                                         status: 'all',
                                         category: '',
                                         stock: 'all',
+                                        brand: '',
+                                        model: '',
+                                        product_type: '',
                                     })
                                 }
                                 className="inline-flex items-center rounded-md border bg-background px-3 py-2 text-sm font-medium hover:bg-accent"
@@ -272,6 +366,9 @@ export default function Index({ products, categories, filters }: Props) {
                                     </th>
                                     <th className="px-4 py-3 font-medium">
                                         SKU
+                                    </th>
+                                    <th className="px-4 py-3 font-medium">
+                                        Brand / Model
                                     </th>
                                     <th className="px-4 py-3 font-medium">
                                         Price
@@ -297,20 +394,31 @@ export default function Index({ products, categories, filters }: Props) {
                                     <tr>
                                         <td
                                             className="px-4 py-8 text-center text-muted-foreground"
-                                            colSpan={8}
+                                            colSpan={9}
                                         >
                                             No products found.
                                         </td>
                                     </tr>
                                 ) : (
-                                    products.data.map((p) => (
+                                    products.data.map((p) => {
+                                        const primaryImageUrl = resolveImageUrl(p.primary_image);
+
+                                        return (
                                         <tr
                                             key={p.id}
                                             className="border-b last:border-b-0"
                                         >
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="h-10 w-10 shrink-0 rounded-md border bg-muted/30" />
+                                                    <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md border bg-muted/30">
+                                                        {primaryImageUrl ? (
+                                                            <img
+                                                                src={primaryImageUrl}
+                                                                alt={p.name}
+                                                                className="h-full w-full object-cover"
+                                                            />
+                                                        ) : null}
+                                                    </div>
                                                     <div className="min-w-0">
                                                         <Link
                                                             href={`/admin/products/${p.slug}`}
@@ -335,6 +443,22 @@ export default function Index({ products, categories, filters }: Props) {
                                                         —
                                                     </span>
                                                 )}
+                                            </td>
+
+                                            <td className="px-4 py-3">
+                                                <div className="space-y-1">
+                                                    <div className="font-medium">
+                                                        {p.brand ?? '—'}
+                                                    </div>
+                                                    <div className="text-xs text-muted-foreground">
+                                                        {p.model_name ?? '—'}
+                                                    </div>
+                                                    {p.product_type ? (
+                                                        <span className="inline-flex rounded bg-muted px-2 py-0.5 text-[10px] capitalize">
+                                                            {p.product_type}
+                                                        </span>
+                                                    ) : null}
+                                                </div>
                                             </td>
 
                                             <td className="px-4 py-3">
@@ -432,7 +556,7 @@ export default function Index({ products, categories, filters }: Props) {
                                                 </div>
                                             </td>
                                         </tr>
-                                    ))
+                                    )})
                                 )}
                             </tbody>
                         </table>

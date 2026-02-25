@@ -3,89 +3,70 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Admin\StoreProductImageRequest;
-use App\Http\Requests\Admin\UpdateProductImageRequest;
-use App\Models\Product;
 use App\Models\ProductImage;
-use App\Services\ProductImageStorageService;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class ProductImageController extends Controller
 {
-    public function store(
-        StoreProductImageRequest $request,
-        Product $product,
-        ProductImageStorageService $storage
-    ): RedirectResponse {
-        $files = $request->file('images', []);
-        $storedPaths = [];
+    public function trashed(Request $request): Response
+    {
+        $q = trim((string) $request->query('q', ''));
 
-        try {
-            foreach ($files as $file) {
-                $storedPaths[] = $storage->storeForProduct($file, $product->id);
-            }
+        $images = ProductImage::query()
+            ->onlyTrashed()
+            ->with([
+                'product' => fn ($query) => $query
+                    ->withTrashed()
+                    ->select(['id', 'name', 'slug']),
+            ])
+            ->when($q !== '', function ($query) use ($q) {
+                $query->where(function ($sub) use ($q) {
+                    $sub->where('path', 'like', "%{$q}%")
+                        ->orWhere('alt', 'like', "%{$q}%")
+                        ->orWhereHas('product', function ($productQuery) use ($q) {
+                            $productQuery
+                                ->withTrashed()
+                                ->where(function ($productSub) use ($q) {
+                                    $productSub->where('name', 'like', "%{$q}%")
+                                        ->orWhere('slug', 'like', "%{$q}%");
+                                });
+                        });
+                });
+            })
+            ->orderByDesc('deleted_at')
+            ->paginate(20)
+            ->withQueryString();
 
-            DB::transaction(function () use ($product, $storedPaths) {
-                $hasPrimary = $product->images()->where('is_primary', true)->exists();
-
-                foreach ($storedPaths as $index => $path) {
-                    $product->images()->create([
-                        'path' => $path,
-                        'is_primary' => (!$hasPrimary && $index === 0),
-                    ]);
-                }
-            });
-
-            return back()->with('success', 'Images uploaded successfully.');
-        } catch (\Throwable $e) {
-            foreach ($storedPaths as $path) {
-                $storage->delete($path);
-            }
-
-            throw $e;
-        }
+        return Inertia::render('admin/product-images/trashed', [
+            'images' => $images,
+            'filters' => [
+                'q' => $q,
+            ],
+        ]);
     }
 
-    public function update(
-        UpdateProductImageRequest $request,
-        ProductImage $productImage
-    ): RedirectResponse {
-        $data = $request->validated();
-
-        if (array_key_exists('is_primary', $data) && $data['is_primary'] === true) {
-            DB::transaction(function () use ($productImage) {
-                $product = $productImage->product;
-
-                $product->images()->update(['is_primary' => false]);
-
-                $productImage->forceFill(['is_primary' => true])->save();
-            });
+    public function restore(ProductImage $productImage): RedirectResponse
+    {
+        if (! $productImage->trashed()) {
+            return back()->with('info', 'Image is not trashed.');
         }
 
-        return back()->with('success', 'Image updated successfully.');
+        $productImage->restore();
+
+        return back()->with('success', 'Image restored.');
     }
 
-    public function destroy(
-        ProductImage $productImage,
-        ProductImageStorageService $storage
-    ): RedirectResponse {
-        $this->authorize('delete', $productImage);
-
-        $path = $productImage->path;
-        $usesSoftDeletes = in_array(SoftDeletes::class, class_uses_recursive($productImage), true);
-
-        DB::transaction(function () use ($productImage) {
-            $productImage->delete();
-        });
-
-        // If the model does NOT use soft deletes, remove the file immediately.
-        // If it DOES use soft deletes, we keep the file for possible restore/audit.
-        if (!$usesSoftDeletes) {
-            $storage->delete($path);
+    public function forceDelete(ProductImage $productImage): RedirectResponse
+    {
+        if (! $productImage->trashed()) {
+            return back()->with('info', 'Image is not trashed.');
         }
 
-        return back()->with('success', 'Image removed successfully.');
+        $productImage->forceDelete();
+
+        return back()->with('success', 'Image permanently deleted.');
     }
 }

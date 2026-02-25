@@ -1,7 +1,3 @@
-<<<<<<< Updated upstream
-import { Head } from '@inertiajs/react';
-import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
-=======
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 import {
@@ -25,13 +21,10 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
->>>>>>> Stashed changes
 import AppLayout from '@/layouts/app-layout';
 import { dashboard } from '@/routes';
 import type { BreadcrumbItem } from '@/types';
 
-<<<<<<< Updated upstream
-=======
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Kpis = {
@@ -150,17 +143,10 @@ const CATEGORY_COLORS = [
     '#0369a1',
 ];
 
->>>>>>> Stashed changes
 const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard().url,
-    },
+    { title: 'Dashboard', href: dashboard().url },
 ];
 
-<<<<<<< Updated upstream
-export default function Dashboard() {
-=======
 // ─── KPI Card ─────────────────────────────────────────────────────────────────
 
 function KpiCard({
@@ -239,27 +225,91 @@ export default function Dashboard({ stats, filters, categories }: Props) {
 
     const isEmpty = revenue_over_time.length === 0;
 
->>>>>>> Stashed changes
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Dashboard" />
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
-                <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-                    <div className="relative aspect-video overflow-hidden rounded-xl border border-sidebar-border/70 dark:border-sidebar-border">
-                        <PlaceholderPattern className="absolute inset-0 size-full stroke-neutral-900/20 dark:stroke-neutral-100/20" />
-                    </div>
-                    <div className="relative aspect-video overflow-hidden rounded-xl border border-sidebar-border/70 dark:border-sidebar-border">
-                        <PlaceholderPattern className="absolute inset-0 size-full stroke-neutral-900/20 dark:stroke-neutral-100/20" />
-                    </div>
-                    <div className="relative aspect-video overflow-hidden rounded-xl border border-sidebar-border/70 dark:border-sidebar-border">
-                        <PlaceholderPattern className="absolute inset-0 size-full stroke-neutral-900/20 dark:stroke-neutral-100/20" />
-                    </div>
+
+            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-4">
+                {/* ── Filter toolbar ─────────────────────────────────────── */}
+                <div className="flex flex-wrap items-center gap-3">
+                    <Select
+                        value={filters.range}
+                        onValueChange={(v) => applyFilter({ range: v })}
+                    >
+                        <SelectTrigger className="w-44">
+                            <SelectValue placeholder="Date range" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {RANGE_OPTIONS.map((o) => (
+                                <SelectItem key={o.value} value={o.value}>
+                                    {o.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    <Select
+                        value={filters.granularity}
+                        onValueChange={(v) => applyFilter({ granularity: v })}
+                    >
+                        <SelectTrigger className="w-36">
+                            <SelectValue placeholder="Granularity" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {GRANULARITY_OPTIONS.map((o) => (
+                                <SelectItem key={o.value} value={o.value}>
+                                    {o.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    <Select
+                        value={
+                            filters.category_id
+                                ? String(filters.category_id)
+                                : 'all'
+                        }
+                        onValueChange={(v) =>
+                            applyFilter({
+                                category_id: v !== 'all' ? Number(v) : null,
+                            })
+                        }
+                    >
+                        <SelectTrigger className="w-44">
+                            <SelectValue placeholder="All categories" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All categories</SelectItem>
+                            {categories.map((c) => (
+                                <SelectItem key={c.id} value={String(c.id)}>
+                                    {c.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
-                <div className="relative min-h-[100vh] flex-1 overflow-hidden rounded-xl border border-sidebar-border/70 md:min-h-min dark:border-sidebar-border">
-                    <PlaceholderPattern className="absolute inset-0 size-full stroke-neutral-900/20 dark:stroke-neutral-100/20" />
+
+                {/* ── KPI cards ──────────────────────────────────────────── */}
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <KpiCard
+                        title="Total Revenue"
+                        value={formatCurrency(kpis.revenue_cents)}
+                    />
+                    <KpiCard
+                        title="Orders"
+                        value={kpis.orders.toLocaleString()}
+                    />
+                    <KpiCard
+                        title="Units Sold"
+                        value={kpis.units.toLocaleString()}
+                    />
+                    <KpiCard
+                        title="Avg. Order Value"
+                        value={formatCurrency(kpis.aov_cents)}
+                        sub="paid & shipped orders"
+                    />
                 </div>
-<<<<<<< Updated upstream
-=======
 
                 {isEmpty ? (
                     <Card>
@@ -598,8 +648,28 @@ export default function Dashboard({ stats, filters, categories }: Props) {
                         </div>
                     </>
                 )}
->>>>>>> Stashed changes
             </div>
         </AppLayout>
+    );
+}
+
+// ─── Skeleton (shown by Inertia deferred props if ever needed) ────────────────
+
+export function DashboardSkeleton() {
+    return (
+        <div className="flex flex-col gap-6 p-4">
+            <div className="flex gap-3">
+                <Skeleton className="h-9 w-44" />
+                <Skeleton className="h-9 w-36" />
+                <Skeleton className="h-9 w-44" />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                    <Skeleton key={i} className="h-24 rounded-xl" />
+                ))}
+            </div>
+            <Skeleton className="h-72 rounded-xl" />
+            <Skeleton className="h-72 rounded-xl" />
+        </div>
     );
 }
