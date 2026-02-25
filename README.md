@@ -112,6 +112,34 @@ This runs the following concurrently:
 
 Default app URL: `http://localhost:8000`
 
+### 7) Use MailHog for local order emails (recommended)
+
+Run MailHog (Docker):
+
+```bash
+docker run --rm -p 1025:1025 -p 8025:8025 mailhog/mailhog
+```
+
+Set mail config in `.env`:
+
+```env
+MAIL_MAILER=smtp
+MAIL_HOST=127.0.0.1
+MAIL_PORT=1025
+MAIL_USERNAME=
+MAIL_PASSWORD=
+```
+
+Then clear cached config (if needed):
+
+```bash
+php artisan config:clear
+```
+
+MailHog UI: `http://localhost:8025`
+
+Note: In the current implementation, order emails are sent when an admin updates an order status to `shipped` or `cancelled`.
+
 ## Useful Commands
 
 ```bash
