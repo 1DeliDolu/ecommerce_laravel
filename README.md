@@ -198,10 +198,30 @@ php artisan test --compact tests/Feature/ShopBrowsingTest.php
 
 ![Cart Area Updated](./public/screenshots/cart/area1.png)
 
+## Home and Shop Pages
+
 ![Admin Product List](./public/screenshots/cart/home.png)
 
 ![Admin Product List](./public/screenshots/cart/shop.png)
 
+## Dashboard Analytics
+
 ![Admin Product List](./public/screenshots/cart/dashboard.png)
+
+## MailHog UI
+
+### Order confirmation email in MailHog UI
+![MailHog UI](./public/screenshots/cart/mailhog2.png)
+
+### Order canceled in MailHog UI
+
+![MailHog UI](./public/screenshots/cart/mailhog.png)
+
+### Shipped order email in MailHog UI
+
+![MailHog UI](./public/screenshots/cart/shipped.png)
+
+
+
 
 
