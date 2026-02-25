@@ -192,3 +192,16 @@ php artisan test --compact tests/Feature/ShopBrowsingTest.php
 
 - If frontend changes do not appear, run `npm run dev` or `npm run build`.
 - Before deployment, run linting, type checks, and tests.
+## Screenshots
+
+![Dashboard Analytics](./public/screenshots/cart/area.png)
+
+![Cart Area Updated](./public/screenshots/cart/area1.png)
+
+![Admin Product List](./public/screenshots/cart/home.png)
+
+![Admin Product List](./public/screenshots/cart/shop.png)
+
+![Admin Product List](./public/screenshots/cart/dashboard.png)
+
+
