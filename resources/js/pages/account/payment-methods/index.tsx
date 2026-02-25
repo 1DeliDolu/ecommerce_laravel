@@ -1,6 +1,12 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { CreditCard, Edit3, Plus, Star, Trash2 } from 'lucide-react';
+import { type FormEvent, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
+import { cn } from '@/lib/utils';
 import {
     destroy as destroyPaymentMethod,
     index as paymentMethodsIndex,
@@ -9,12 +15,6 @@ import {
     update as updatePaymentMethod,
 } from '@/routes/account/payment-methods';
 import type { BreadcrumbItem } from '@/types';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
-import { type FormEvent, useMemo, useState } from 'react';
 
 type PaymentMethod = {
     id: number;
@@ -162,19 +162,26 @@ export default function PaymentMethodsIndex() {
             <Head title="Payment Methods" />
 
             <div className="space-y-6 p-4">
-                <section className="overflow-hidden rounded-2xl border bg-gradient-to-br from-sky-50 via-cyan-50 to-emerald-50">
+                <section className="overflow-hidden rounded-2xl border bg-sky-50">
                     <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
                         <div className="space-y-2">
-                            <p className="text-xs font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+                            <p className="text-xs font-semibold tracking-[0.12em] text-black uppercase">
                                 Account Wallet
                             </p>
-                            <h1 className="text-2xl font-semibold tracking-tight">Payment Methods</h1>
-                            <p className="max-w-2xl text-sm text-muted-foreground">
-                                Add and manage your cards. Card numbers must be 16 digits and CVC must be 3-4 digits.
+                            <h1 className="text-2xl font-semibold tracking-tight text-black">
+                                Payment Methods
+                            </h1>
+                            <p className="max-w-2xl text-sm text-black">
+                                Add and manage your cards. Card numbers must be
+                                16 digits and CVC must be 3-4 digits.
                             </p>
                         </div>
 
-                        <Button type="button" onClick={beginCreate} className="self-start sm:self-auto">
+                        <Button
+                            type="button"
+                            onClick={beginCreate}
+                            className="self-start sm:self-auto"
+                        >
                             <Plus className="size-4" />
                             New Card
                         </Button>
@@ -184,9 +191,15 @@ export default function PaymentMethodsIndex() {
                 {formVisible && (
                     <section className="rounded-2xl border bg-card p-5 shadow-sm">
                         <div className="mb-4 flex items-center justify-between">
-                            <h2 className="text-lg font-semibold">{pageTitle}</h2>
+                            <h2 className="text-lg font-semibold">
+                                {pageTitle}
+                            </h2>
                             {paymentMethods.length > 0 && (
-                                <Button type="button" variant="ghost" onClick={cancelForm}>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={cancelForm}
+                                >
                                     Cancel
                                 </Button>
                             )}
@@ -199,33 +212,58 @@ export default function PaymentMethodsIndex() {
                                     <Input
                                         id="label"
                                         value={form.data.label}
-                                        onChange={(event) => form.setData('label', event.target.value)}
+                                        onChange={(event) =>
+                                            form.setData(
+                                                'label',
+                                                event.target.value,
+                                            )
+                                        }
                                         placeholder="Primary, Work..."
                                     />
                                     {form.errors.label && (
-                                        <p className="text-xs text-destructive">{form.errors.label}</p>
+                                        <p className="text-xs text-destructive">
+                                            {form.errors.label}
+                                        </p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="card_holder_name">Card Holder Name</Label>
+                                    <Label htmlFor="card_holder_name">
+                                        Card Holder Name
+                                    </Label>
                                     <Input
                                         id="card_holder_name"
                                         value={form.data.card_holder_name}
-                                        onChange={(event) => form.setData('card_holder_name', event.target.value)}
+                                        onChange={(event) =>
+                                            form.setData(
+                                                'card_holder_name',
+                                                event.target.value,
+                                            )
+                                        }
                                         placeholder="Name Surname"
                                     />
                                     {form.errors.card_holder_name && (
-                                        <p className="text-xs text-destructive">{form.errors.card_holder_name}</p>
+                                        <p className="text-xs text-destructive">
+                                            {form.errors.card_holder_name}
+                                        </p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2 md:col-span-2">
-                                    <Label htmlFor="card_number">Card Number</Label>
+                                    <Label htmlFor="card_number">
+                                        Card Number
+                                    </Label>
                                     <Input
                                         id="card_number"
                                         value={form.data.card_number}
-                                        onChange={(event) => form.setData('card_number', formatCardNumber(event.target.value))}
+                                        onChange={(event) =>
+                                            form.setData(
+                                                'card_number',
+                                                formatCardNumber(
+                                                    event.target.value,
+                                                ),
+                                            )
+                                        }
                                         inputMode="numeric"
                                         autoComplete="cc-number"
                                         placeholder={
@@ -235,39 +273,61 @@ export default function PaymentMethodsIndex() {
                                         }
                                     />
                                     {form.errors.card_number && (
-                                        <p className="text-xs text-destructive">{form.errors.card_number}</p>
+                                        <p className="text-xs text-destructive">
+                                            {form.errors.card_number}
+                                        </p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="expiry_month">Expiry Month</Label>
+                                    <Label htmlFor="expiry_month">
+                                        Expiry Month
+                                    </Label>
                                     <Input
                                         id="expiry_month"
                                         value={form.data.expiry_month}
                                         onChange={(event) =>
-                                            form.setData('expiry_month', onlyDigits(event.target.value, 2))
+                                            form.setData(
+                                                'expiry_month',
+                                                onlyDigits(
+                                                    event.target.value,
+                                                    2,
+                                                ),
+                                            )
                                         }
                                         inputMode="numeric"
                                         placeholder="MM"
                                     />
                                     {form.errors.expiry_month && (
-                                        <p className="text-xs text-destructive">{form.errors.expiry_month}</p>
+                                        <p className="text-xs text-destructive">
+                                            {form.errors.expiry_month}
+                                        </p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="expiry_year">Expiry Year</Label>
+                                    <Label htmlFor="expiry_year">
+                                        Expiry Year
+                                    </Label>
                                     <Input
                                         id="expiry_year"
                                         value={form.data.expiry_year}
                                         onChange={(event) =>
-                                            form.setData('expiry_year', onlyDigits(event.target.value, 4))
+                                            form.setData(
+                                                'expiry_year',
+                                                onlyDigits(
+                                                    event.target.value,
+                                                    4,
+                                                ),
+                                            )
                                         }
                                         inputMode="numeric"
                                         placeholder="YYYY"
                                     />
                                     {form.errors.expiry_year && (
-                                        <p className="text-xs text-destructive">{form.errors.expiry_year}</p>
+                                        <p className="text-xs text-destructive">
+                                            {form.errors.expiry_year}
+                                        </p>
                                     )}
                                 </div>
 
@@ -276,12 +336,26 @@ export default function PaymentMethodsIndex() {
                                     <Input
                                         id="cvc"
                                         value={form.data.cvc}
-                                        onChange={(event) => form.setData('cvc', onlyDigits(event.target.value, 4))}
+                                        onChange={(event) =>
+                                            form.setData(
+                                                'cvc',
+                                                onlyDigits(
+                                                    event.target.value,
+                                                    4,
+                                                ),
+                                            )
+                                        }
                                         inputMode="numeric"
-                                        placeholder={isEditing ? 'Optional when not changing card' : '123'}
+                                        placeholder={
+                                            isEditing
+                                                ? 'Optional when not changing card'
+                                                : '123'
+                                        }
                                     />
                                     {form.errors.cvc && (
-                                        <p className="text-xs text-destructive">{form.errors.cvc}</p>
+                                        <p className="text-xs text-destructive">
+                                            {form.errors.cvc}
+                                        </p>
                                     )}
                                 </div>
                             </div>
@@ -289,7 +363,12 @@ export default function PaymentMethodsIndex() {
                             <label className="flex items-center gap-3 rounded-md border bg-muted/30 px-3 py-2">
                                 <Checkbox
                                     checked={form.data.is_default}
-                                    onCheckedChange={(checked) => form.setData('is_default', checked === true)}
+                                    onCheckedChange={(checked) =>
+                                        form.setData(
+                                            'is_default',
+                                            checked === true,
+                                        )
+                                    }
                                 />
                                 <span className="text-sm font-medium">
                                     Set as default payment method
@@ -297,11 +376,18 @@ export default function PaymentMethodsIndex() {
                             </label>
 
                             <div className="flex flex-wrap gap-2">
-                                <Button type="submit" disabled={form.processing}>
+                                <Button
+                                    type="submit"
+                                    disabled={form.processing}
+                                >
                                     {primaryActionLabel}
                                 </Button>
                                 {paymentMethods.length > 0 && (
-                                    <Button type="button" variant="outline" onClick={cancelForm}>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={cancelForm}
+                                    >
                                         Cancel
                                     </Button>
                                 )}
@@ -314,11 +400,17 @@ export default function PaymentMethodsIndex() {
                     {sortedPaymentMethods.length === 0 && !formVisible && (
                         <div className="col-span-full rounded-2xl border border-dashed bg-muted/20 p-8 text-center">
                             <CreditCard className="mx-auto mb-3 size-6 text-muted-foreground" />
-                            <h3 className="text-base font-semibold">No cards saved</h3>
+                            <h3 className="text-base font-semibold">
+                                No cards saved
+                            </h3>
                             <p className="mt-1 text-sm text-muted-foreground">
                                 Add your first card to speed up checkout.
                             </p>
-                            <Button type="button" className="mt-4" onClick={beginCreate}>
+                            <Button
+                                type="button"
+                                className="mt-4"
+                                onClick={beginCreate}
+                            >
                                 Add Card
                             </Button>
                         </div>
@@ -329,16 +421,18 @@ export default function PaymentMethodsIndex() {
                             key={paymentMethod.id}
                             className={cn(
                                 'rounded-2xl border bg-card p-5 shadow-sm transition',
-                                paymentMethod.is_default && 'border-sky-300 bg-sky-50/40',
+                                paymentMethod.is_default &&
+                                    'border-sky-300 bg-sky-50/40',
                             )}
                         >
                             <div className="mb-4 flex items-start justify-between gap-3">
                                 <div>
-                                    <p className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
+                                    <p className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
                                         {paymentMethod.label ?? 'Card'}
                                     </p>
                                     <h3 className="text-base font-semibold">
-                                        {paymentMethod.brand} •••• {paymentMethod.last_four}
+                                        {paymentMethod.brand} ••••{' '}
+                                        {paymentMethod.last_four}
                                     </h3>
                                 </div>
 
@@ -351,10 +445,15 @@ export default function PaymentMethodsIndex() {
                             </div>
 
                             <div className="space-y-1.5 text-sm text-muted-foreground">
-                                <p className="text-foreground">{paymentMethod.card_holder_name}</p>
+                                <p className="text-foreground">
+                                    {paymentMethod.card_holder_name}
+                                </p>
                                 <p>
-                                    Expires {String(paymentMethod.expiry_month).padStart(2, '0')}/
-                                    {paymentMethod.expiry_year}
+                                    Expires{' '}
+                                    {String(
+                                        paymentMethod.expiry_month,
+                                    ).padStart(2, '0')}
+                                    /{paymentMethod.expiry_year}
                                 </p>
                             </div>
 
@@ -374,7 +473,9 @@ export default function PaymentMethodsIndex() {
                                         type="button"
                                         size="sm"
                                         variant="outline"
-                                        onClick={() => makeDefault(paymentMethod)}
+                                        onClick={() =>
+                                            makeDefault(paymentMethod)
+                                        }
                                     >
                                         <Star className="size-3.5" />
                                         Set Default
@@ -385,7 +486,9 @@ export default function PaymentMethodsIndex() {
                                     type="button"
                                     size="sm"
                                     variant="destructive"
-                                    onClick={() => removePaymentMethod(paymentMethod)}
+                                    onClick={() =>
+                                        removePaymentMethod(paymentMethod)
+                                    }
                                 >
                                     <Trash2 className="size-3.5" />
                                     Delete

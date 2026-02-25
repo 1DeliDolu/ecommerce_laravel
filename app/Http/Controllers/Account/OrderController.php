@@ -14,7 +14,8 @@ class OrderController extends Controller
     {
         $user = $request->user();
 
-        $orders = $user->orders()
+        $orders = Order::query()
+            ->whereBelongsTo($user)
             ->withCount('items')
             ->orderByDesc('created_at')
             ->paginate(10)
@@ -24,6 +25,7 @@ class OrderController extends Controller
 
                 return [
                     'id' => $order->id,
+                    'user_id' => $order->user_id,
                     'public_id' => $order->public_id,
                     'status' => $order->status,
                     'total' => $order->total,

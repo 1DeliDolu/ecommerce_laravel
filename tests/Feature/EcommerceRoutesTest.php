@@ -13,6 +13,15 @@ class EcommerceRoutesTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_guest_can_access_public_cart_page(): void
+    {
+        $this->get(route('cart.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('cart/index')
+            );
+    }
+
     public function test_guests_are_redirected_from_account_and_admin_routes_to_login(): void
     {
         $this->get(route('account.orders.index'))

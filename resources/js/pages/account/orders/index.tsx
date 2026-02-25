@@ -6,6 +6,7 @@ import type { Auth, BreadcrumbItem } from '@/types';
 
 type OrderRow = {
     id: number;
+    user_id: number | null;
     public_id: string;
     status: 'pending' | 'paid' | 'shipped' | 'cancelled';
     total: string;
@@ -70,6 +71,7 @@ function statusClasses(status: OrderRow['status']): string {
 
 export default function OrdersIndex() {
     const { auth, orders } = usePage<{ auth: Auth; orders: Paginator<OrderRow> }>().props;
+    const visibleOrders = orders.data.filter((order) => order.user_id === auth.user.id);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -99,14 +101,14 @@ export default function OrdersIndex() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {orders.data.length === 0 ? (
+                                {visibleOrders.length === 0 ? (
                                     <tr>
                                         <td className="px-4 py-8 text-center text-muted-foreground" colSpan={5}>
                                             You do not have any orders yet.
                                         </td>
                                     </tr>
                                 ) : (
-                                    orders.data.map((order) => (
+                                    visibleOrders.map((order) => (
                                         <tr key={order.id} className="border-b last:border-b-0">
                                             <td className="px-4 py-3 font-medium">{order.public_id}</td>
                                             <td className="px-4 py-3">
@@ -134,7 +136,7 @@ export default function OrdersIndex() {
                                 </>
                             ) : (
                                 <>
-                                    Showing <span className="font-medium">{orders.data.length}</span>
+                                    Showing <span className="font-medium">{visibleOrders.length}</span>
                                 </>
                             )}
                         </div>

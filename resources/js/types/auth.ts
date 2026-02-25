@@ -26,9 +26,21 @@ export type DefaultAddress = {
     is_default: boolean;
 };
 
+export type DefaultPaymentMethod = {
+    id: number;
+    label: string | null;
+    card_holder_name: string;
+    brand: string;
+    last_four: string;
+    expiry_month: number;
+    expiry_year: number;
+    is_default: boolean;
+};
+
 export type Auth = {
     user: User;
     default_address?: DefaultAddress | null;
+    default_payment_method?: DefaultPaymentMethod | null;
     can: {
         access_admin: boolean;
     };

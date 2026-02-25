@@ -11,6 +11,7 @@ type Category = {
 type ImageInput = {
     disk?: string;
     path: string;
+    image_url?: string | null;
     alt?: string | null;
     sort_order?: number;
     is_primary?: boolean;
@@ -18,6 +19,13 @@ type ImageInput = {
 
 type ProductFormData = {
     name: string;
+    brand: string;
+    model_name: string;
+    product_type: string;
+    color: string;
+    material: string;
+    available_clothing_sizes: string[];
+    available_shoe_sizes: string[];
     slug: string;
     description: string;
     price: string;
@@ -27,13 +35,24 @@ type ProductFormData = {
     is_active: boolean;
     category_ids: number[];
     images: ImageInput[];
+    uploaded_images: File[];
 };
 
 type Mode = 'create' | 'edit';
 
+type CatalogOptions = {
+    brands: string[];
+    models: string[];
+    colors: string[];
+    product_types: string[];
+    clothing_sizes: string[];
+    shoe_sizes: string[];
+};
+
 type Props = {
     mode: Mode;
     categories: Category[];
+    catalogOptions: CatalogOptions;
     submitUrl: string;
     method?: 'post' | 'put' | 'patch';
     initialValues?: Partial<ProductFormData>;
@@ -48,9 +67,42 @@ function slugify(input: string) {
         .replace(/(^-|-$)+/g, '');
 }
 
+function resolveImageUrl(image: ImageInput): string | null {
+    if (typeof image.image_url === 'string' && image.image_url.trim() !== '') {
+        return image.image_url;
+    }
+
+    if (image.path.trim() === '') {
+        return null;
+    }
+
+    if (image.path.startsWith('http://') || image.path.startsWith('https://')) {
+        return image.path;
+    }
+
+    if (image.path.startsWith('/')) {
+        return image.path;
+    }
+
+    if ((image.disk ?? 'public') === 'public') {
+        return `/storage/${image.path.replace(/^\/+/, '')}`;
+    }
+
+    return null;
+}
+
+function formatOptionLabel(value: string): string {
+    if (value.length === 0) {
+        return value;
+    }
+
+    return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 export default function ProductForm({
     mode,
     categories,
+    catalogOptions,
     submitUrl,
     method = 'post',
     initialValues,
@@ -59,13 +111,20 @@ export default function ProductForm({
         data,
         setData,
         post,
-        put,
-        patch,
+        transform,
         processing,
         errors,
         recentlySuccessful,
+        progress,
     } = useForm<ProductFormData>({
         name: initialValues?.name ?? '',
+        brand: initialValues?.brand ?? '',
+        model_name: initialValues?.model_name ?? '',
+        product_type: initialValues?.product_type ?? '',
+        color: initialValues?.color ?? '',
+        material: initialValues?.material ?? '',
+        available_clothing_sizes: initialValues?.available_clothing_sizes ?? [],
+        available_shoe_sizes: initialValues?.available_shoe_sizes ?? [],
         slug: initialValues?.slug ?? '',
         description: initialValues?.description ?? '',
         price: initialValues?.price ?? '',
@@ -75,11 +134,27 @@ export default function ProductForm({
         is_active: initialValues?.is_active ?? true,
         category_ids: initialValues?.category_ids ?? [],
         images: initialValues?.images ?? [],
+        uploaded_images: [],
     });
 
     const sortedCategories = useMemo(() => {
         return categories.slice().sort((a, b) => a.name.localeCompare(b.name));
     }, [categories]);
+
+    const uploadedImagePreviews = useMemo(() => {
+        return data.uploaded_images.map((file) => ({
+            key: `${file.name}-${file.size}-${file.lastModified}`,
+            name: file.name,
+            sizeKb: Math.ceil(file.size / 1024),
+            url: URL.createObjectURL(file),
+        }));
+    }, [data.uploaded_images]);
+
+    useEffect(() => {
+        return () => {
+            uploadedImagePreviews.forEach((preview) => URL.revokeObjectURL(preview.url));
+        };
+    }, [uploadedImagePreviews]);
 
     // UX: auto-suggest slug only on create, only if user hasn't typed a custom slug.
     useEffect(() => {
@@ -99,6 +174,18 @@ export default function ProductForm({
                 ? data.category_ids.filter((x) => x !== id)
                 : [...data.category_ids, id],
         );
+    };
+
+    const toggleMultiSelectValue = (
+        key: 'available_clothing_sizes' | 'available_shoe_sizes',
+        value: string,
+    ) => {
+        const has = data[key].includes(value);
+        const nextValues = has
+            ? data[key].filter((current) => current !== value)
+            : [...data[key], value];
+
+        setData(key, nextValues);
     };
 
     const addImage = () => {
@@ -131,19 +218,37 @@ export default function ProductForm({
         setData('images', next);
     };
 
+    const handleUploadedImages = (files: FileList | null) => {
+        if (files === null) {
+            setData('uploaded_images', []);
+
+            return;
+        }
+
+        setData('uploaded_images', Array.from(files));
+    };
+
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
 
-        const action =
-            method === 'put' ? put : method === 'patch' ? patch : post;
+        if (method !== 'post') {
+            transform((payload) => ({
+                ...payload,
+                _method: method.toUpperCase(),
+            }));
+        }
 
-        action(submitUrl, {
+        post(submitUrl, {
             preserveScroll: true,
+            forceFormData: true,
+            onSuccess: () => {
+                setData('uploaded_images', []);
+            },
         });
     };
 
     return (
-        <form onSubmit={submit} className="space-y-6">
+        <form onSubmit={submit} className="space-y-6" encType="multipart/form-data">
             {/* Top actions */}
             <div className="flex items-center justify-between gap-2">
                 <div className="text-sm text-muted-foreground">
@@ -193,6 +298,173 @@ export default function ProductForm({
                             unique.
                         </div>
                     )}
+                </div>
+
+                <div>
+                    <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                        Brand
+                    </label>
+                    <select
+                        value={data.brand}
+                        onChange={(e) => setData('brand', e.target.value)}
+                        className="w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background outline-none focus:ring-2 focus:ring-ring"
+                    >
+                        <option value="">Select brand</option>
+                        {catalogOptions.brands.map((brand) => (
+                            <option key={brand} value={brand}>
+                                {brand}
+                            </option>
+                        ))}
+                    </select>
+                    {errors.brand ? (
+                        <div className="mt-1 text-xs text-destructive">
+                            {errors.brand}
+                        </div>
+                    ) : null}
+                </div>
+
+                <div>
+                    <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                        Model
+                    </label>
+                    <select
+                        value={data.model_name}
+                        onChange={(e) => setData('model_name', e.target.value)}
+                        className="w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background outline-none focus:ring-2 focus:ring-ring"
+                    >
+                        <option value="">Select model</option>
+                        {catalogOptions.models.map((model) => (
+                            <option key={model} value={model}>
+                                {model}
+                            </option>
+                        ))}
+                    </select>
+                    {errors.model_name ? (
+                        <div className="mt-1 text-xs text-destructive">
+                            {errors.model_name}
+                        </div>
+                    ) : null}
+                </div>
+
+                <div>
+                    <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                        Product type
+                    </label>
+                    <select
+                        value={data.product_type}
+                        onChange={(e) => setData('product_type', e.target.value)}
+                        className="w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background outline-none focus:ring-2 focus:ring-ring"
+                    >
+                        <option value="">Select type</option>
+                        {catalogOptions.product_types.map((type) => (
+                            <option key={type} value={type}>
+                                {formatOptionLabel(type)}
+                            </option>
+                        ))}
+                    </select>
+                    {errors.product_type ? (
+                        <div className="mt-1 text-xs text-destructive">
+                            {errors.product_type}
+                        </div>
+                    ) : null}
+                </div>
+
+                <div>
+                    <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                        Color
+                    </label>
+                    <select
+                        value={data.color}
+                        onChange={(e) => setData('color', e.target.value)}
+                        className="w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background outline-none focus:ring-2 focus:ring-ring"
+                    >
+                        <option value="">Select color</option>
+                        {catalogOptions.colors.map((color) => (
+                            <option key={color} value={color}>
+                                {color}
+                            </option>
+                        ))}
+                    </select>
+                    {errors.color ? (
+                        <div className="mt-1 text-xs text-destructive">
+                            {errors.color}
+                        </div>
+                    ) : null}
+                </div>
+
+                <div>
+                    <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                        Material
+                    </label>
+                    <input
+                        value={data.material}
+                        onChange={(e) => setData('material', e.target.value)}
+                        className="w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background outline-none focus:ring-2 focus:ring-ring"
+                        placeholder="e.g. Cotton Blend"
+                    />
+                    {errors.material ? (
+                        <div className="mt-1 text-xs text-destructive">
+                            {errors.material}
+                        </div>
+                    ) : null}
+                </div>
+
+                <div>
+                    <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                        Clothing sizes
+                    </label>
+                    <div className="grid grid-cols-4 gap-2 rounded-md border bg-background p-2">
+                        {catalogOptions.clothing_sizes.map((size) => (
+                            <label
+                                key={size}
+                                className="flex items-center gap-2 rounded px-2 py-1 text-xs hover:bg-accent"
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={data.available_clothing_sizes.includes(size)}
+                                    onChange={() =>
+                                        toggleMultiSelectValue('available_clothing_sizes', size)
+                                    }
+                                    className="h-4 w-4"
+                                />
+                                <span>{size}</span>
+                            </label>
+                        ))}
+                    </div>
+                    {(errors as Record<string, string>).available_clothing_sizes ? (
+                        <div className="mt-1 text-xs text-destructive">
+                            {(errors as Record<string, string>).available_clothing_sizes}
+                        </div>
+                    ) : null}
+                </div>
+
+                <div>
+                    <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                        Shoe sizes
+                    </label>
+                    <div className="grid grid-cols-4 gap-2 rounded-md border bg-background p-2">
+                        {catalogOptions.shoe_sizes.map((size) => (
+                            <label
+                                key={size}
+                                className="flex items-center gap-2 rounded px-2 py-1 text-xs hover:bg-accent"
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={data.available_shoe_sizes.includes(size)}
+                                    onChange={() =>
+                                        toggleMultiSelectValue('available_shoe_sizes', size)
+                                    }
+                                    className="h-4 w-4"
+                                />
+                                <span>{size}</span>
+                            </label>
+                        ))}
+                    </div>
+                    {(errors as Record<string, string>).available_shoe_sizes ? (
+                        <div className="mt-1 text-xs text-destructive">
+                            {(errors as Record<string, string>).available_shoe_sizes}
+                        </div>
+                    ) : null}
                 </div>
 
                 <div>
@@ -328,14 +600,14 @@ export default function ProductForm({
                 </div>
             </div>
 
-            {/* Images (temporary) */}
+            {/* Images */}
             <div className="rounded-md border bg-background p-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h3 className="text-sm font-medium">Images</h3>
                         <p className="text-xs text-muted-foreground">
-                            Temporary input (path strings). We'll replace this
-                            with real uploads later.
+                            You can upload images from your computer or manage
+                            existing image paths.
                         </p>
                     </div>
 
@@ -346,6 +618,55 @@ export default function ProductForm({
                     >
                         Add image
                     </button>
+                </div>
+
+                <div className="mt-4 rounded-md border border-dashed bg-muted/20 p-3">
+                    <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                        Upload from computer
+                    </label>
+                    <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={(event) =>
+                            handleUploadedImages(event.target.files)
+                        }
+                        className="w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background outline-none focus:ring-2 focus:ring-ring"
+                    />
+                    {(errors as Record<string, string>).uploaded_images ? (
+                        <div className="mt-1 text-xs text-destructive">
+                            {(errors as Record<string, string>).uploaded_images}
+                        </div>
+                    ) : null}
+                    {uploadedImagePreviews.length > 0 ? (
+                        <div className="mt-2 space-y-2 text-xs text-muted-foreground">
+                            <div className="font-medium text-foreground">
+                                Selected files:
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                                {uploadedImagePreviews.map((preview) => (
+                                    <div key={preview.key} className="space-y-1">
+                                        <div className="aspect-square overflow-hidden rounded-md border bg-muted/30">
+                                            <img
+                                                src={preview.url}
+                                                alt={preview.name}
+                                                className="h-full w-full object-cover"
+                                            />
+                                        </div>
+                                        <div className="truncate" title={preview.name}>
+                                            {preview.name}
+                                        </div>
+                                        <div>{preview.sizeKb} KB</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ) : null}
+                    {progress ? (
+                        <div className="mt-2 text-xs text-muted-foreground">
+                            Uploading: {progress.percentage}%
+                        </div>
+                    ) : null}
                 </div>
 
                 {errors.images ? (
@@ -360,9 +681,21 @@ export default function ProductForm({
                             No images.
                         </div>
                     ) : (
-                        data.images.map((img, idx) => (
+                        data.images.map((img, idx) => {
+                            const imageUrl = resolveImageUrl(img);
+
+                            return (
                             <div key={idx} className="rounded-md border p-3">
                                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                    <div className="h-16 w-16 shrink-0 overflow-hidden rounded-md border bg-muted/30">
+                                        {imageUrl ? (
+                                            <img
+                                                src={imageUrl}
+                                                alt={img.alt ?? `Image ${idx + 1}`}
+                                                className="h-full w-full object-cover"
+                                            />
+                                        ) : null}
+                                    </div>
                                     <div className="grid w-full gap-3 md:grid-cols-3">
                                         <div className="md:col-span-2">
                                             <label className="mb-1 block text-xs font-medium text-muted-foreground">
@@ -476,7 +809,7 @@ export default function ProductForm({
                                     </div>
                                 </div>
                             </div>
-                        ))
+                        )})
                     )}
                 </div>
             </div>

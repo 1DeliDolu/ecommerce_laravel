@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\Product;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Arr;
@@ -35,6 +36,9 @@ class ProductController extends Controller implements HasMiddleware
         $status = (string) $request->query('status', 'all'); // all|active|inactive
         $category = (string) $request->query('category', ''); // category slug
         $stock = (string) $request->query('stock', 'all'); // all|in|out
+        $brand = trim((string) $request->query('brand', ''));
+        $model = trim((string) $request->query('model', ''));
+        $productType = trim((string) $request->query('product_type', ''));
 
         $products = Product::query()
             ->with([
@@ -46,13 +50,18 @@ class ProductController extends Controller implements HasMiddleware
                 $query->where(function ($sub) use ($q) {
                     $sub->where('name', 'like', '%'.$q.'%')
                         ->orWhere('slug', 'like', '%'.$q.'%')
-                        ->orWhere('sku', 'like', '%'.$q.'%');
+                        ->orWhere('sku', 'like', '%'.$q.'%')
+                        ->orWhere('brand', 'like', '%'.$q.'%')
+                        ->orWhere('model_name', 'like', '%'.$q.'%');
                 });
             })
             ->when($status === 'active', fn ($query) => $query->where('is_active', true))
             ->when($status === 'inactive', fn ($query) => $query->where('is_active', false))
             ->when($stock === 'in', fn ($query) => $query->where('stock', '>', 0))
             ->when($stock === 'out', fn ($query) => $query->where('stock', '=', 0))
+            ->when($brand !== '', fn ($query) => $query->where('brand', 'like', '%'.$brand.'%'))
+            ->when($model !== '', fn ($query) => $query->where('model_name', 'like', '%'.$model.'%'))
+            ->when($productType !== '', fn ($query) => $query->where('product_type', $productType))
             ->when($category !== '', function ($query) use ($category) {
                 $query->whereHas('categories', fn ($q) => $q->where('slug', $category));
             })
@@ -73,7 +82,11 @@ class ProductController extends Controller implements HasMiddleware
                 'status' => $status,
                 'category' => $category,
                 'stock' => $stock,
+                'brand' => $brand,
+                'model' => $model,
+                'product_type' => $productType,
             ],
+            'catalog_options' => $this->catalogOptions(),
         ]);
     }
 
@@ -86,16 +99,25 @@ class ProductController extends Controller implements HasMiddleware
 
         return Inertia::render('admin/products/create', [
             'categories' => $categories,
+            'catalog_options' => $this->catalogOptions(),
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
         $validated = $this->validatePayload($request);
+        $uploadedImages = $this->storeUploadedImages($request);
 
-        return DB::transaction(function () use ($validated) {
+        return DB::transaction(function () use ($validated, $uploadedImages) {
             $productData = Arr::only($validated, [
                 'name',
+                'brand',
+                'model_name',
+                'product_type',
+                'color',
+                'material',
+                'available_clothing_sizes',
+                'available_shoe_sizes',
                 'slug',
                 'description',
                 'price',
@@ -112,14 +134,27 @@ class ProductController extends Controller implements HasMiddleware
 
             $productData['slug'] = $this->makeUniqueSlug($baseSlug);
             $productData['primary_category_id'] = $this->resolvePrimaryCategoryId($validated);
+            $productData['available_clothing_sizes'] = $this->normalizeOptionSelections(
+                $validated['available_clothing_sizes'] ?? [],
+                Product::clothingSizeOptions(),
+            );
+            $productData['available_shoe_sizes'] = $this->normalizeOptionSelections(
+                $validated['available_shoe_sizes'] ?? [],
+                Product::shoeSizeOptions(),
+            );
 
             /** @var Product $product */
             $product = Product::query()->create($productData);
 
             $product->categories()->sync($validated['category_ids']);
 
-            if (! empty($validated['images'])) {
-                $images = $this->normalizeImages($validated['images']);
+            $providedImages = is_array($validated['images'] ?? null)
+                ? $validated['images']
+                : [];
+            $imagesPayload = [...$providedImages, ...$uploadedImages];
+
+            if (! empty($imagesPayload)) {
+                $images = $this->normalizeImages($imagesPayload);
                 $product->images()->createMany($images);
             }
 
@@ -157,16 +192,25 @@ class ProductController extends Controller implements HasMiddleware
             'product' => $product,
             'categories' => $categories,
             'selectedCategoryIds' => $product->categories->pluck('id')->all(),
+            'catalog_options' => $this->catalogOptions(),
         ]);
     }
 
     public function update(Request $request, Product $product): RedirectResponse
     {
         $validated = $this->validatePayload($request, $product);
+        $uploadedImages = $this->storeUploadedImages($request);
 
-        return DB::transaction(function () use ($validated, $product) {
+        return DB::transaction(function () use ($validated, $uploadedImages, $product) {
             $productData = Arr::only($validated, [
                 'name',
+                'brand',
+                'model_name',
+                'product_type',
+                'color',
+                'material',
+                'available_clothing_sizes',
+                'available_shoe_sizes',
                 'slug',
                 'description',
                 'price',
@@ -185,17 +229,46 @@ class ProductController extends Controller implements HasMiddleware
             }
 
             $productData['primary_category_id'] = $this->resolvePrimaryCategoryId($validated);
+            $productData['available_clothing_sizes'] = $this->normalizeOptionSelections(
+                $validated['available_clothing_sizes'] ?? [],
+                Product::clothingSizeOptions(),
+            );
+            $productData['available_shoe_sizes'] = $this->normalizeOptionSelections(
+                $validated['available_shoe_sizes'] ?? [],
+                Product::shoeSizeOptions(),
+            );
 
             $product->update($productData);
 
             $product->categories()->sync($validated['category_ids']);
 
             // If images are provided, replace all images (soft delete old ones).
-            if (array_key_exists('images', $validated) && is_array($validated['images'])) {
+            $hasImagePayload = array_key_exists('images', $validated) || ! empty($uploadedImages);
+
+            if ($hasImagePayload) {
                 $product->images()->delete();
 
-                if (! empty($validated['images'])) {
-                    $images = $this->normalizeImages($validated['images']);
+                $providedImages = is_array($validated['images'] ?? null)
+                    ? $validated['images']
+                    : [];
+                $imagesPayload = [...$providedImages, ...$uploadedImages];
+
+                if (! empty($uploadedImages)) {
+                    $imagesPayload = array_map(function (array $image): array {
+                        $image['is_primary'] = false;
+
+                        return $image;
+                    }, $imagesPayload);
+
+                    $firstUploadedIndex = count($providedImages);
+
+                    if (isset($imagesPayload[$firstUploadedIndex])) {
+                        $imagesPayload[$firstUploadedIndex]['is_primary'] = true;
+                    }
+                }
+
+                if (! empty($imagesPayload)) {
+                    $images = $this->normalizeImages($imagesPayload);
                     $product->images()->createMany($images);
                 }
             }
@@ -233,6 +306,15 @@ class ProductController extends Controller implements HasMiddleware
             ],
 
             'description' => ['nullable', 'string'],
+            'brand' => ['nullable', Rule::in(Product::brandOptions())],
+            'model_name' => ['nullable', Rule::in(Product::modelOptions())],
+            'product_type' => ['nullable', 'string', Rule::in(Product::productTypes())],
+            'color' => ['nullable', Rule::in(Product::colorOptions())],
+            'material' => ['nullable', 'string', 'max:120'],
+            'available_clothing_sizes' => ['nullable', 'array', 'max:20'],
+            'available_clothing_sizes.*' => ['string', Rule::in(Product::clothingSizeOptions())],
+            'available_shoe_sizes' => ['nullable', 'array', 'max:20'],
+            'available_shoe_sizes.*' => ['string', Rule::in(Product::shoeSizeOptions())],
 
             'price' => ['required', 'numeric', 'min:0'],
             'compare_at_price' => ['nullable', 'numeric', 'min:0', 'gte:price'],
@@ -252,14 +334,65 @@ class ProductController extends Controller implements HasMiddleware
             'category_ids.*' => ['integer', Rule::exists('categories', 'id')],
             'primary_category_id' => ['nullable', 'integer', Rule::exists('categories', 'id')],
 
-            // Images (optional for now; later we will handle uploads)
+            // Existing image rows + uploaded files
             'images' => ['sometimes', 'array'],
             'images.*.disk' => ['nullable', 'string', 'max:64'],
             'images.*.path' => ['required_with:images', 'string', 'max:2048'],
             'images.*.alt' => ['nullable', 'string', 'max:255'],
             'images.*.sort_order' => ['nullable', 'integer', 'min:0'],
             'images.*.is_primary' => ['nullable', 'boolean'],
+
+            'uploaded_images' => ['sometimes', 'array'],
+            'uploaded_images.*' => ['file', 'image', 'max:5120'],
         ]);
+    }
+
+    /**
+     * @return array{
+     *     brands: list<string>,
+     *     models: list<string>,
+     *     colors: list<string>,
+     *     product_types: list<string>,
+     *     clothing_sizes: list<string>,
+     *     shoe_sizes: list<string>
+     * }
+     */
+    private function catalogOptions(): array
+    {
+        return [
+            'brands' => Product::brandOptions(),
+            'models' => Product::modelOptions(),
+            'colors' => Product::colorOptions(),
+            'product_types' => Product::productTypes(),
+            'clothing_sizes' => Product::clothingSizeOptions(),
+            'shoe_sizes' => Product::shoeSizeOptions(),
+        ];
+    }
+
+    private function storeUploadedImages(Request $request): array
+    {
+        $files = $request->file('uploaded_images', []);
+
+        if (! is_array($files)) {
+            return [];
+        }
+
+        $storedImages = [];
+
+        foreach ($files as $file) {
+            if (! $file instanceof UploadedFile || ! $file->isValid()) {
+                continue;
+            }
+
+            $storedImages[] = [
+                'disk' => 'public',
+                'path' => $file->storePublicly('products', 'public'),
+                'alt' => null,
+                'is_primary' => false,
+            ];
+        }
+
+        return $storedImages;
     }
 
     private function resolvePrimaryCategoryId(array $validated): int
@@ -332,5 +465,27 @@ class ProductController extends Controller implements HasMiddleware
         }
 
         return $normalized;
+    }
+
+    /**
+     * @param  list<string>|array<int, string>  $inputValues
+     * @param  list<string>  $allowedValues
+     * @return list<string>|null
+     */
+    private function normalizeOptionSelections(array $inputValues, array $allowedValues): ?array
+    {
+        $allowedMap = collect($allowedValues)
+            ->mapWithKeys(static fn (string $value): array => [$value => true]);
+
+        $values = collect($inputValues)
+            ->filter(static fn (mixed $value): bool => is_string($value))
+            ->map(static fn (string $value): string => trim($value))
+            ->filter(static fn (string $value): bool => $value !== '')
+            ->filter(static fn (string $value): bool => $allowedMap->has($value))
+            ->unique()
+            ->values()
+            ->all();
+
+        return count($values) > 0 ? $values : null;
     }
 }

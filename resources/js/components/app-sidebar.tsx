@@ -29,7 +29,7 @@ import {
 import { toUrl } from '@/lib/utils';
 import type { Auth, NavItem } from '@/types';
 import AppLogo from '@/components/app-logo';
-import { dashboard } from '@/routes';
+import { dashboard, home } from '@/routes';
 import { index as adminCategoriesIndex } from '@/routes/admin/categories';
 import { index as adminOrdersIndex } from '@/routes/admin/orders';
 import { index as adminOverviewIndex } from '@/routes/admin/overview';
@@ -85,7 +85,7 @@ export function AppSidebar() {
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
-                            <Link href={toUrl(dashboard())}>
+                            <Link href={toUrl(home())}>
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>

@@ -22,6 +22,13 @@ type ProductImage = {
 type Product = {
     id: number;
     name: string;
+    brand: string | null;
+    model_name: string | null;
+    product_type: string | null;
+    color: string | null;
+    material: string | null;
+    available_clothing_sizes: string[] | null;
+    available_shoe_sizes: string[] | null;
     slug: string;
     sku: string | null;
     description: string | null;
@@ -42,9 +49,30 @@ function formatMoney(value: string | number) {
     return n.toFixed(2);
 }
 
+function resolveImageUrl(image: ProductImage | null): string | null {
+    if (!image || image.path.trim() === '') {
+        return null;
+    }
+
+    if (image.path.startsWith('http://') || image.path.startsWith('https://')) {
+        return image.path;
+    }
+
+    if (image.path.startsWith('/')) {
+        return image.path;
+    }
+
+    if (image.disk === 'public' || image.disk.trim() === '') {
+        return `/storage/${image.path.replace(/^\/+/, '')}`;
+    }
+
+    return null;
+}
+
 export default function Show({ product }: Props) {
     const primary =
         product.images.find((i) => i.is_primary) ?? product.images[0] ?? null;
+    const primaryImageUrl = resolveImageUrl(primary);
 
     return (
         <AppLayout>
@@ -99,7 +127,15 @@ export default function Show({ product }: Props) {
                         </p>
 
                         <div className="mt-4 space-y-3">
-                            <div className="aspect-square w-full rounded-md border bg-muted/30" />
+                            <div className="aspect-square w-full overflow-hidden rounded-md border bg-muted/30">
+                                {primaryImageUrl ? (
+                                    <img
+                                        src={primaryImageUrl}
+                                        alt={primary?.alt ?? product.name}
+                                        className="h-full w-full object-cover"
+                                    />
+                                ) : null}
+                            </div>
                             <div className="flex flex-wrap gap-2">
                                 {product.images.length === 0 ? (
                                     <span className="text-xs text-muted-foreground">
@@ -112,18 +148,30 @@ export default function Show({ product }: Props) {
                                             (a, b) =>
                                                 a.sort_order - b.sort_order,
                                         )
-                                        .map((img) => (
-                                            <div
-                                                key={img.id}
-                                                className={[
-                                                    'h-12 w-12 rounded-md border bg-muted/30',
-                                                    img.is_primary
-                                                        ? 'ring-2 ring-ring'
-                                                        : '',
-                                                ].join(' ')}
-                                                title={img.alt ?? img.path}
-                                            />
-                                        ))
+                                        .map((img) => {
+                                            const imageUrl = resolveImageUrl(img);
+
+                                            return (
+                                                <div
+                                                    key={img.id}
+                                                    className={[
+                                                        'h-12 w-12 overflow-hidden rounded-md border bg-muted/30',
+                                                        img.is_primary
+                                                            ? 'ring-2 ring-ring'
+                                                            : '',
+                                                    ].join(' ')}
+                                                    title={img.alt ?? img.path}
+                                                >
+                                                    {imageUrl ? (
+                                                        <img
+                                                            src={imageUrl}
+                                                            alt={img.alt ?? product.name}
+                                                            className="h-full w-full object-cover"
+                                                        />
+                                                    ) : null}
+                                                </div>
+                                            );
+                                        })
                                 )}
                             </div>
 
@@ -202,6 +250,51 @@ export default function Show({ product }: Props) {
                                             —
                                         </span>
                                     )}
+                                </div>
+                            </div>
+
+                            <div>
+                                <div className="text-xs text-muted-foreground">
+                                    Brand / Model
+                                </div>
+                                <div className="mt-1 text-sm font-medium">
+                                    {product.brand ?? '—'} / {product.model_name ?? '—'}
+                                </div>
+                            </div>
+
+                            <div>
+                                <div className="text-xs text-muted-foreground">
+                                    Type / Color
+                                </div>
+                                <div className="mt-1 text-sm font-medium">
+                                    {product.product_type ?? '—'} / {product.color ?? '—'}
+                                </div>
+                            </div>
+
+                            <div>
+                                <div className="text-xs text-muted-foreground">
+                                    Material
+                                </div>
+                                <div className="mt-1 text-sm font-medium">
+                                    {product.material ?? '—'}
+                                </div>
+                            </div>
+
+                            <div>
+                                <div className="text-xs text-muted-foreground">
+                                    Clothing sizes
+                                </div>
+                                <div className="mt-1 text-sm font-medium">
+                                    {(product.available_clothing_sizes ?? []).join(', ') || '—'}
+                                </div>
+                            </div>
+
+                            <div>
+                                <div className="text-xs text-muted-foreground">
+                                    Shoe sizes
+                                </div>
+                                <div className="mt-1 text-sm font-medium">
+                                    {(product.available_shoe_sizes ?? []).join(', ') || '—'}
                                 </div>
                             </div>
                         </div>

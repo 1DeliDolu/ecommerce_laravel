@@ -27,7 +27,8 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
-        $user = $request->user()?->loadMissing('defaultAddress');
+        $user = $request->user()?->loadMissing('defaultAddress', 'defaultPaymentMethod');
+        $defaultPaymentMethod = $user?->defaultPaymentMethod;
 
         return array_merge(parent::share($request), [
             'auth' => [
@@ -45,6 +46,16 @@ class HandleInertiaRequests extends Middleware
                     'postal_code' => $user->defaultAddress->postal_code,
                     'country' => $user->defaultAddress->country,
                     'is_default' => $user->defaultAddress->is_default,
+                ],
+                'default_payment_method' => $defaultPaymentMethod === null ? null : [
+                    'id' => $defaultPaymentMethod->id,
+                    'label' => $defaultPaymentMethod->label,
+                    'card_holder_name' => $defaultPaymentMethod->card_holder_name ?? $defaultPaymentMethod->cardholder_name,
+                    'brand' => $defaultPaymentMethod->brand,
+                    'last_four' => $defaultPaymentMethod->last_four ?? $defaultPaymentMethod->last4,
+                    'expiry_month' => $defaultPaymentMethod->expiry_month ?? $defaultPaymentMethod->exp_month,
+                    'expiry_year' => $defaultPaymentMethod->expiry_year ?? $defaultPaymentMethod->exp_year,
+                    'is_default' => $defaultPaymentMethod->is_default,
                 ],
                 'can' => [
                     'access_admin' => $user?->can('access-admin') ?? false,

@@ -17,6 +17,8 @@ class OrderItem extends Model
         'product_name',
         'product_slug',
         'product_sku',
+        'variant_key',
+        'selected_options',
         'quantity',
         'unit_price_cents',
         'line_total_cents',
@@ -26,6 +28,7 @@ class OrderItem extends Model
 
     protected $casts = [
         'quantity' => 'integer',
+        'selected_options' => 'array',
     ];
 
     protected $appends = [
